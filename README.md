@@ -20,8 +20,6 @@ needs already built and hardened:
 - **Tooling** — ESLint, `vue-tsc`, Vitest (unit + a real end-to-end sign-in
   test), GitHub Actions, Dependabot.
 
-It's extracted from [Plannrr](https://github.com/thriftrr/plannrr) and
-Mealrr, so what's here has shipped before.
 
 ## Start a new app
 
