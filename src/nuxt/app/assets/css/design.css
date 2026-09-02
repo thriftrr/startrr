@@ -1,0 +1,435 @@
+/* ============================================================
+   FONT — Nunito Sans, self-hosted variable woff2.
+   Two axes: wght 400..800 AND opsz 6..12. The optical-size axis
+   is load-bearing: below 12px it opens the letterforms up, which
+   is exactly where the 11px uppercase labels live. Declaring the
+   font as pinned static weights (what @nuxt/fonts emits by
+   default) drops opsz and renders those labels ~2.5% tight.
+   font-optical-sizing: auto is the browser default — do not
+   disable it, and do not replace these with static instances.
+   ============================================================ */
+
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/NunitoSans/NunitoSans-Variable-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/NunitoSans/NunitoSans-Variable-latinext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/NunitoSans/NunitoSans-Variable-latin-Italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/NunitoSans/NunitoSans-Variable-latinext-Italic.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ============================================================
+   Design tokens + base
+   The cream-and-teal system shared by Plannrr and Mealrr. Every
+   palette re-tints the --teal family + sidebar; everything else
+   reads the same tokens, so a new palette is a dozen lines.
+   ============================================================ */
+
+:root {
+  /* ---------- SURFACE ---------- */
+  --bg-app:       #faf6ef;
+  --bg-card:      #fff;
+  --bg-input:     #fffdf8;
+  --bg-sunk:      #faf6ef;
+
+  /* ---------- BORDERS (cards are 1.5px, dividers 1px) ---------- */
+  --border:       #e5dfd3;
+  --border-input: #d8d2c6;
+  --border-strong:#b3aa99;
+  --border-soft:  #eee7d9;
+  --border-hair:  #f2ecdf;
+
+  /* ---------- TEXT ---------- */
+  --fg:           #2b2a26;
+  --fg-muted:     #6f6a5c;
+  --fg-subtle:    #8b8577;
+  --fg-faint:     #a09a8b;
+
+  /* ---------- TEAL — brand ---------- */
+  --teal:         #12968b;
+  --teal-dark:    #0d7268;
+  --teal-deep:    #0e7c73;  /* sidebar ground */
+  --teal-bg:      #eef7f5;
+  --teal-border:  #bfe3dd;
+  --teal-badge:   #dcf3ef;
+
+  /* sidebar-local ramp */
+  --nav-fg:       #dff4f1;
+  --nav-fg-dim:   #b5e2dc;
+  --nav-fg-faint: #8fd0c8;
+  --nav-accent:   #9fe3da;
+
+  /* ---------- SEMANTIC ---------- */
+  --ok:           #2c7a3f;
+  --ok-bg:        #e3f4e6;
+  --ok-dot:       #3d9e57;
+  --ok-strong:    #1e5c2e;
+  --ok-strong-bg: #cdeec7;
+
+  --warn:         #8a6d1a;
+  --warn-bg:      #fdf3d7;
+  --note-bg:      #fdf6df;
+  --note-border:  #eddfa8;
+
+  --danger:       #b3402e;
+  --danger-bg:    #fbe9e5;
+  --danger-dark:  #8c2f1f;
+
+  --neutral-bg:   #eee7d9;
+
+  /* ---------- RADIUS ---------- */
+  --r-card:   14px;
+  --r-panel:  16px;
+  --r-field:  9px;
+  --r-sm:     8px;
+  --r-xs:     7px;
+  --r-pill:   999px;
+
+  /* ---------- SHADOW ---------- */
+  --shadow-card:  0 3px 14px rgba(43, 42, 38, 0.05);
+  --shadow-hover: 0 2px 10px rgba(18, 150, 139, 0.12);
+  --shadow-pop:   0 3px 10px rgba(43, 42, 38, 0.3);
+
+  /* ---------- TYPE ---------- */
+  --font: 'Nunito Sans', system-ui, -apple-system, sans-serif;
+
+  /* ---------- LAYOUT ---------- */
+  --sidebar-w:           216px;
+  --sidebar-w-collapsed: 62px;
+  --content-max:         980px;
+}
+
+/* ============================================================
+   PALETTES — re-tints of the accent family, sidebar, and
+   badge tints (ids in shared/types/palette.ts). Every sidebar
+   ground keeps white text ≥ 4.5:1; the cream ground only shifts
+   a hair so cards and borders read the same everywhere.
+   ============================================================ */
+
+html[data-palette="ocean"] {
+  --bg-app: #f7f7f1; --bg-sunk: #f7f7f1;
+  --teal: #2f6fd6; --teal-dark: #1f56b0; --teal-deep: #1f5fb8;
+  --teal-bg: #ecf2fc; --teal-border: #bdd3f3; --teal-badge: #d9e6fa;
+  --nav-fg: #e0ebfb; --nav-fg-dim: #b9cff3; --nav-fg-faint: #93b6ea; --nav-accent: #a9c9f7;
+  --shadow-hover: 0 2px 10px rgba(47, 111, 214, 0.14);
+}
+html[data-palette="forest"] {
+  --bg-app: #f9f7ee; --bg-sunk: #f9f7ee;
+  --teal: #3a8f4a; --teal-dark: #2b6e38; --teal-deep: #2e7340;
+  --teal-bg: #edf6ee; --teal-border: #bfe0c4; --teal-badge: #d9efdc;
+  --nav-fg: #e1f3e4; --nav-fg-dim: #b7dcbd; --nav-fg-faint: #91c79b; --nav-accent: #a4e2ad;
+  --shadow-hover: 0 2px 10px rgba(58, 143, 74, 0.14);
+}
+html[data-palette="plum"] {
+  --bg-app: #faf5f2; --bg-sunk: #faf5f2;
+  --teal: #8a4bb0; --teal-dark: #6c3a8c; --teal-deep: #6f3f8f;
+  --teal-bg: #f4eef8; --teal-border: #dcc6ea; --teal-badge: #e9daf3;
+  --nav-fg: #f0e4f7; --nav-fg-dim: #d7c2e6; --nav-fg-faint: #bda1d3; --nav-accent: #d8b6ef;
+  --shadow-hover: 0 2px 10px rgba(138, 75, 176, 0.14);
+}
+html[data-palette="ember"] {
+  --bg-app: #fbf5ec; --bg-sunk: #fbf5ec;
+  --teal: #c6532b; --teal-dark: #9c3f20; --teal-deep: #a8452a;
+  --teal-bg: #fbeee8; --teal-border: #efc5b4; --teal-badge: #f6dcd0;
+  --nav-fg: #fbe6de; --nav-fg-dim: #f0c2b2; --nav-fg-faint: #e5a08a; --nav-accent: #f5c0aa;
+  --shadow-hover: 0 2px 10px rgba(198, 83, 43, 0.14);
+}
+html[data-palette="slate"] {
+  --bg-app: #f6f5f1; --bg-sunk: #f6f5f1;
+  --teal: #5b6b83; --teal-dark: #43526a; --teal-deep: #46546b;
+  --teal-bg: #eff1f5; --teal-border: #c9d1dd; --teal-badge: #dfe4ec;
+  --nav-fg: #e6eaf1; --nav-fg-dim: #c3ccd9; --nav-fg-faint: #9faab9; --nav-accent: #b8c6da;
+  --shadow-hover: 0 2px 10px rgba(91, 107, 131, 0.14);
+}
+html[data-palette="rose"] {
+  --bg-app: #fbf5f1; --bg-sunk: #fbf5f1;
+  --teal: #c2456a; --teal-dark: #9a3253; --teal-deep: #a03a5b;
+  --teal-bg: #fbeef2; --teal-border: #efc3d1; --teal-badge: #f6d9e1;
+  --nav-fg: #fbe3ea; --nav-fg-dim: #f0bfcc; --nav-fg-faint: #e49bb0; --nav-accent: #f4b8c8;
+  --shadow-hover: 0 2px 10px rgba(194, 69, 106, 0.14);
+}
+
+/* ------------------------------------------------------------
+   CONTRAST NOTE — measured against WCAG 2.1 AA (4.5:1 normal text)
+   These values are the design's, kept verbatim. Four of them fall
+   short at small sizes; listed here so the tradeoff is explicit
+   rather than accidental:
+
+     --fg-faint   #a09a8b on cream    2.60:1   (12px meta text)
+     --nav-faint  #8fd0c8 on teal     2.90:1   (11.5px tagline)
+     --teal       #12968b on cream    3.38:1   (link text)
+     white on --teal button           3.65:1   (13.5px bold)
+
+   AA-clean substitutions that preserve the hue, if wanted:
+     --fg-faint  -> #777161 (4.51)   --nav-faint -> #e7f5f3 (4.52)
+     --teal(link)-> #0f7f76 (4.51)   button bg   -> var(--teal-dark) (5.79)
+   ------------------------------------------------------------ */
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  font-family: var(--font);
+  color: var(--fg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--teal); }
+a:hover { color: var(--teal-dark); }
+
+input, button, select, textarea { font-family: var(--font); }
+
+h1, h2, h3 { margin: 0; font-weight: 800; }
+
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* ============================================================
+   SHARED COMPONENTS
+   Named y- to stay clear of page-scoped class names.
+   ============================================================ */
+
+/* ----- Card ----- */
+.y-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 22px;
+}
+
+.y-card-title { font-size: 16px; font-weight: 800; }
+
+/* clickable card (Home tiles) */
+.y-tile {
+  display: block;
+  padding: 22px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-card);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.y-tile:hover {
+  border-color: var(--teal);
+  box-shadow: var(--shadow-hover);
+  color: inherit;
+}
+.y-tile-title { margin-top: 10px; font-size: 17px; font-weight: 800; color: var(--teal-dark); }
+.y-tile p { margin: 8px 0 0; font-size: 13.5px; color: var(--fg-muted); line-height: 1.55; }
+
+/* ----- Buttons ----- */
+.y-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--r-field);
+  background: var(--teal);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.y-btn:hover:not(:disabled) { background: var(--teal-dark); }
+.y-btn:disabled { opacity: 0.55; cursor: default; }
+
+.y-btn-secondary {
+  padding: 8px 16px;
+  border: 1.5px solid var(--border-input);
+  border-radius: var(--r-field);
+  background: var(--bg-card);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.y-btn-secondary:hover:not(:disabled) { border-color: var(--border-strong); }
+.y-btn-secondary:disabled { opacity: 0.55; cursor: default; }
+
+.y-btn-outline {
+  padding: 9px 16px;
+  border: 1.5px solid var(--teal);
+  border-radius: var(--r-field);
+  background: var(--bg-card);
+  color: var(--teal-dark);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+.y-btn-outline:disabled { cursor: wait; opacity: 0.6; }
+
+/* dashed "choose a file" affordance */
+.y-btn-dashed {
+  padding: 10px 16px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--r-field);
+  background: var(--bg-input);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.y-btn-dashed:hover:not(:disabled) { border-color: var(--teal); color: var(--teal-dark); }
+
+.y-btn-link {
+  border: none;
+  background: none;
+  color: var(--teal);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.y-btn-danger {
+  padding: 6px 14px;
+  border: 1.5px solid var(--border-input);
+  border-radius: var(--r-sm);
+  background: var(--bg-card);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--danger);
+  cursor: pointer;
+}
+.y-btn-danger:hover:not(:disabled) { border-color: var(--danger); }
+
+/* ----- Fields ----- */
+.y-input {
+  padding: 11px 13px;
+  border: 1.5px solid var(--border-input);
+  border-radius: var(--r-field);
+  font-size: 14px;
+  background: var(--bg-input);
+  color: var(--fg);
+}
+.y-input:focus { border-color: var(--teal); outline: none; }
+.y-input:disabled {
+  border-color: var(--border-soft);
+  background: var(--bg-sunk);
+  color: var(--fg-subtle);
+}
+
+.y-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.y-field input, .y-field select {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border-input);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--bg-input);
+  color: var(--fg);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.y-field input:focus, .y-field select:focus { border-color: var(--teal); outline: none; }
+.y-field input:disabled {
+  border-color: var(--border-soft);
+  background: var(--bg-sunk);
+  color: var(--fg-subtle);
+}
+
+/* ----- Pills & badges ----- */
+.y-pill {
+  display: inline-block;
+  border-radius: var(--r-pill);
+  padding: 4px 11px;
+  font-weight: 800;
+  font-size: 12px;
+}
+.y-pill-ok      { background: var(--ok-strong-bg); color: var(--ok-strong); }
+.y-pill-ok-soft { background: var(--ok-bg);        color: var(--ok); }
+.y-pill-warn    { background: var(--warn-bg);      color: var(--warn); }
+.y-pill-neutral { background: var(--neutral-bg);   color: var(--fg-muted); }
+
+.y-badge {
+  background: var(--ok-bg);
+  color: var(--ok);
+  font-weight: 800;
+  font-size: 11.5px;
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+}
+
+/* ----- Callouts ----- */
+.y-banner {
+  background: var(--teal-bg);
+  border: 1.5px solid var(--teal-border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  color: #3c4a46;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.y-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ok-dot);
+  flex: none;
+}
+
+.y-note {
+  background: var(--note-bg);
+  border: 1.5px solid var(--note-border);
+  border-radius: var(--r-field);
+  padding: 11px 13px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+/* ----- Text helpers ----- */
+.y-lede   { font-size: 15px; color: var(--fg-muted); }
+.y-body   { font-size: 13.5px; color: var(--fg-muted); line-height: 1.55; }
+.y-small  { font-size: 12.5px; color: var(--fg-faint); }
+.y-tiny   { font-size: 12px; color: var(--fg-faint); }
+.y-error  { color: var(--danger); }
+
+/* wordmark — the teal period is the brand mark in micro */
+.y-wordmark { font-weight: 800; letter-spacing: 0.5px; text-decoration: none; color: inherit; }
+.y-wordmark span { color: var(--teal); }

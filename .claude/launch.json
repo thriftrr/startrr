@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "startrr-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "src/nuxt", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
+    }
+  ]
+}
