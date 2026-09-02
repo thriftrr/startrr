@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /src/nuxt
+    schedule:
+      interval: weekly
+    groups:
+      nuxt:
+        patterns: ["nuxt", "@nuxt/*", "@nuxthub/*", "nitropack", "h3"]
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
