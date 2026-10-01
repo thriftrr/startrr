@@ -3,6 +3,14 @@ import { and, eq, gt, isNull, lt, ne, sql } from 'drizzle-orm'
 // Queries over the NuxtHub drizzle client (`db` and `schema` are
 // auto-imported server globals provided by @nuxthub/core).
 
+// Expiry columns hold ISO strings written by the app, so "now" has to be one
+// too. SQLite's datetime('now') reads '2026-10-01 12:00:00', which sorts
+// below every ISO time on the same day ('T' > ' ') — compared against it, a
+// 15-minute link stayed valid until midnight UTC.
+function nowIso (): string {
+  return new Date().toISOString()
+}
+
 export interface DbUser {
   id: string
   email: string
@@ -67,7 +75,7 @@ export function displayNameOf (user: { firstName?: string | null, lastName?: str
 export async function insertLoginToken (tokenHash: string, email: string, expiresAt: string): Promise<void> {
   // Spent and expired hashes are worthless; sweep them so the table stays
   // the size of "links in flight".
-  await db.delete(schema.loginTokens).where(lt(schema.loginTokens.expiresAt, sql`datetime('now')`)).run()
+  await db.delete(schema.loginTokens).where(lt(schema.loginTokens.expiresAt, nowIso())).run()
   await db.insert(schema.loginTokens).values({ tokenHash, email, expiresAt }).run()
 }
 
@@ -79,7 +87,7 @@ export async function spendLoginToken (tokenHash: string): Promise<string | null
     .where(and(
       eq(schema.loginTokens.tokenHash, tokenHash),
       isNull(schema.loginTokens.usedAt),
-      gt(schema.loginTokens.expiresAt, sql`datetime('now')`)
+      gt(schema.loginTokens.expiresAt, nowIso())
     ))
     .returning({ email: schema.loginTokens.email })
   return rows[0]?.email ?? null
@@ -101,7 +109,7 @@ const MAX_UA = 300
 export async function createSession (userId: string, userAgent: string, ttlSeconds: number): Promise<SessionRow> {
   // Expired rows are dead weight; sweep on the write path so nothing needs
   // a cron.
-  await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, sql`datetime('now')`)).run()
+  await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, nowIso())).run()
   const now = new Date()
   const row: SessionRow = {
     id: crypto.randomUUID(),
@@ -138,6 +146,6 @@ export async function deleteUserSessions (userId: string, exceptId?: string): Pr
 
 export async function listUserSessions (userId: string): Promise<SessionRow[]> {
   return await db.select().from(schema.sessions)
-    .where(and(eq(schema.sessions.userId, userId), gt(schema.sessions.expiresAt, sql`datetime('now')`)))
+    .where(and(eq(schema.sessions.userId, userId), gt(schema.sessions.expiresAt, nowIso())))
     .all()
 }
