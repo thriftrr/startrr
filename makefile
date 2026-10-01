@@ -13,6 +13,11 @@ check:
 test:
 	cd src/nuxt && npm test
 
+# Boot the production worker in workerd (local D1/KV/R2) and make a few
+# requests — catches a bundle that throws on load. Not beside `make up`.
+smoke:
+	cd src/nuxt && bash scripts/smoke.sh
+
 # Rename the app (once, right after "Use this template"):
 #   make rename NAME=Plannrr
 rename:
@@ -28,4 +33,4 @@ secrets:
 deploy:
 	cd src/nuxt && bash scripts/deploy.sh
 
-.PHONY: build up check test rename secrets deploy
+.PHONY: build up check test smoke rename secrets deploy

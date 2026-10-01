@@ -2,7 +2,7 @@
 import { APP_NAME, APP_SLUG, APP_TAGLINE } from '#shared/app'
 
 // Collapsible rail with flyout tooltips when collapsed, and the avatar /
-// initials footer. Add your pages to `items`.
+// initials footer; a top bar on phones. Add your pages to `items`.
 const { user } = useAuth()
 const route = useRoute()
 const { public: { feedback: feedbackEnabled } } = useRuntimeConfig()
@@ -109,11 +109,12 @@ onMounted(() => {
             size="17"
             aria-hidden="true"
           />
-          <span v-if="!collapsed">{{ item.label }}</span>
+          <span class="label">{{ item.label }}</span>
         </NuxtLink>
         <div
           v-if="collapsed && hovered === item.label"
           class="flyout"
+          aria-hidden="true"
         >
           <span class="arrow" />{{ item.label }}
         </div>
@@ -141,11 +142,12 @@ onMounted(() => {
             size="17"
             aria-hidden="true"
           />
-          <span v-if="!collapsed">Feedback inbox</span>
+          <span class="label">Feedback inbox</span>
         </NuxtLink>
         <div
           v-if="collapsed && hovered === 'Feedback inbox'"
           class="flyout"
+          aria-hidden="true"
         >
           <span class="arrow" />Feedback inbox
         </div>
@@ -171,10 +173,7 @@ onMounted(() => {
           v-else
           class="avatar initials"
         >{{ initials }}</span>
-        <span
-          v-if="!collapsed"
-          class="email"
-        >{{ user.email }}</span>
+        <span class="email">{{ user.email }}</span>
       </NuxtLink>
       <NuxtLink
         v-else
@@ -183,10 +182,7 @@ onMounted(() => {
         title="Sign in"
       >
         <span class="avatar initials">→</span>
-        <span
-          v-if="!collapsed"
-          class="email"
-        >Sign in</span>
+        <span class="email">Sign in</span>
       </NuxtLink>
     </div>
   </aside>
@@ -354,4 +350,74 @@ onMounted(() => {
 }
 
 .email { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Labels stay in the page whenever there's no room to show them, so an
+   icon-only link still has a name for screen readers. */
+.shell.collapsed .label,
+.shell.collapsed .email {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Phones: the rail turns into a top bar — mark, icon links, the account
+   link — and the collapse toggle goes away. It scrolls with the page rather
+   than sticking, so it can never cover the focused element (2.4.11). */
+@media (max-width: 700px) {
+  .shell,
+  .shell.collapsed {
+    position: static;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+  .shell .head,
+  .shell.collapsed .head { flex-direction: row; gap: 6px; }
+  .toggle,
+  .tagline,
+  .flyout { display: none; }
+  .mark { padding-left: 0; }
+  .nav,
+  .nav.admin {
+    flex-direction: row;
+    gap: 2px;
+    margin: 0 0 0 6px;
+    padding: 0;
+    border: none;
+  }
+  .shell .item,
+  .shell.collapsed .item {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    justify-content: center;
+  }
+  .shell .label,
+  .shell .email {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .foot { margin: 0 0 0 auto; padding: 0; border: none; }
+  .shell .user,
+  .shell.collapsed .user { padding: 4px; }
+  .avatar { width: 32px; height: 32px; }
+}
 </style>

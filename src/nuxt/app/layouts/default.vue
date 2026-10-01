@@ -16,4 +16,9 @@
   align-items: flex-start;
   min-height: 100vh;
 }
+
+/* Phones: the sidebar is a top bar (AppSidebar.vue), the page below it. */
+@media (max-width: 700px) {
+  .app { flex-direction: column; align-items: stretch; }
+}
 </style>

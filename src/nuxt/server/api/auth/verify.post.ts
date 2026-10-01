@@ -16,5 +16,6 @@ export default defineEventHandler(async (event) => {
 
   const user = await ensureUser(email)
   await startSession(event, { id: user.id, email: user.email })
-  return { user: { email: user.email } }
+  // The verify page offers a passkey to accounts that have none yet.
+  return { user: { email: user.email }, passkeys: await countUserPasskeys(user.id) }
 })

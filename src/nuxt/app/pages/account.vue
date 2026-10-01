@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { PALETTES, DEFAULT_PALETTE } from '#shared/types/palette'
+import { MAX_PASSKEYS } from '#shared/types/passkey'
+import type { PasskeyList, PasskeySummary } from '#shared/types/passkey'
 
 useHead({ title: 'Account' })
 
@@ -29,7 +31,8 @@ onMounted(async () => {
   // Signed-out visitors never reach this page — auth.global.ts redirects them.
   if (!user.value) return
   syncFromUser()
-  await loadSessions()
+  passkeySupport.value = passkeysSupported() ? 'yes' : 'no'
+  await Promise.all([loadSessions(), loadPasskeys()])
 })
 
 async function saveProfile () {
@@ -120,6 +123,63 @@ async function choosePalette (id: string) {
     paletteError.value = err.data?.statusMessage ?? 'Could not save that palette — it applies for now anyway.'
   } finally {
     paletteBusy.value = false
+  }
+}
+
+// ---- Passkeys ------------------------------------------------------------------
+const passkeys = ref<PasskeySummary[]>([])
+// 'unknown' until mounted: only the browser knows whether it can make one.
+const passkeySupport = ref<'unknown' | 'yes' | 'no'>('unknown')
+const passkeyBusy = ref<'' | 'adding' | 'removing'>('')
+const passkeyMessage = ref('')
+const passkeyError = ref('')
+const confirmRemovePasskey = ref('')
+
+const passkeysFull = computed(() => passkeys.value.length >= MAX_PASSKEYS)
+
+// "Apple Passwords passkey" when we know the provider, otherwise where it
+// was made: enough to tell two apart when choosing which to remove.
+function passkeyLabel (p: PasskeySummary): string {
+  return p.provider ? `${p.provider} passkey` : `passkey added on ${describeUa(p.userAgent)}`
+}
+
+async function loadPasskeys () {
+  try {
+    passkeys.value = (await $fetch<PasskeyList>('/api/account/passkeys')).passkeys
+  } catch { /* the card shows an empty list */ }
+}
+
+async function onAddPasskey () {
+  if (passkeyBusy.value) return
+  passkeyBusy.value = 'adding'
+  passkeyMessage.value = ''
+  passkeyError.value = ''
+  confirmRemovePasskey.value = ''
+  try {
+    passkeys.value = (await addPasskey()).passkeys
+    passkeyMessage.value = 'Passkey added — choose it next time you sign in.'
+  } catch (cause: unknown) {
+    passkeyError.value = passkeyErrorMessage(cause, 'No passkey was added.')
+  } finally {
+    passkeyBusy.value = ''
+  }
+}
+
+async function onRemovePasskey (id: string) {
+  if (passkeyBusy.value) return
+  passkeyBusy.value = 'removing'
+  passkeyMessage.value = ''
+  passkeyError.value = ''
+  try {
+    passkeys.value = (await removePasskey(id)).passkeys
+    passkeyMessage.value = 'Passkey removed.'
+    confirmRemovePasskey.value = ''
+  } catch (cause: unknown) {
+    const err = cause as { data?: { statusMessage?: string } }
+    passkeyError.value = err.data?.statusMessage ?? 'Could not remove that passkey.'
+    await loadPasskeys()
+  } finally {
+    passkeyBusy.value = ''
   }
 }
 
@@ -327,12 +387,14 @@ async function signOut () {
             <p
               v-if="avatarError"
               class="y-error msg"
+              role="alert"
             >
               {{ avatarError }}
             </p>
             <p
               v-if="profileError"
               class="y-error msg"
+              role="alert"
             >
               {{ profileError }}
             </p>
@@ -395,8 +457,106 @@ async function signOut () {
         <p
           v-if="paletteError"
           class="y-error msg"
+          role="alert"
         >
           {{ paletteError }}
+        </p>
+      </section>
+
+      <section
+        id="passkeys"
+        class="y-card"
+      >
+        <div class="head-row">
+          <div class="y-card-title">
+            Passkeys
+          </div>
+          <span class="y-pill y-pill-neutral">{{ passkeys.length }} {{ passkeys.length === 1 ? 'passkey' : 'passkeys' }}</span>
+        </div>
+        <p class="y-body">
+          Sign in with your fingerprint, face, or screen lock instead of waiting
+          for an email. Email links always work too, so removing a passkey never
+          locks you out.
+        </p>
+        <ul
+          v-if="passkeys.length"
+          class="session-list"
+        >
+          <li
+            v-for="p in passkeys"
+            :key="p.id"
+            class="session-row"
+          >
+            <Icon
+              name="lucide:key-round"
+              size="18"
+              aria-hidden="true"
+            />
+            <span class="session-name">{{ p.provider ?? 'Passkey' }}</span>
+            <span
+              v-if="p.synced"
+              class="y-badge"
+            >Synced</span>
+            <span class="passkey-meta">
+              added {{ timeAgo(p.createdAt) || 'just now' }} on {{ describeUa(p.userAgent) }}
+              · {{ p.lastUsedAt ? `last used ${timeAgo(p.lastUsedAt) || 'just now'}` : 'not used yet' }}
+            </span>
+            <span class="passkey-actions">
+              <template v-if="confirmRemovePasskey === p.id">
+                <button
+                  class="y-btn-danger"
+                  :disabled="!!passkeyBusy"
+                  @click="onRemovePasskey(p.id)"
+                >
+                  {{ passkeyBusy === 'removing' ? 'Removing…' : 'Yes, remove it' }}
+                </button>
+                <button
+                  class="y-btn-link"
+                  :disabled="!!passkeyBusy"
+                  @click="confirmRemovePasskey = ''"
+                >
+                  Cancel
+                </button>
+              </template>
+              <button
+                v-else
+                class="y-btn-link"
+                :disabled="!!passkeyBusy"
+                :aria-label="`Remove ${passkeyLabel(p)}`"
+                @click="confirmRemovePasskey = p.id"
+              >
+                Remove
+              </button>
+            </span>
+          </li>
+        </ul>
+        <div class="row">
+          <button
+            class="y-btn-outline"
+            :disabled="passkeySupport !== 'yes' || !!passkeyBusy || passkeysFull"
+            @click="onAddPasskey"
+          >
+            {{ passkeyBusy === 'adding' ? 'Waiting for your device…' : 'Add a passkey' }}
+          </button>
+          <span
+            v-if="passkeySupport === 'no'"
+            class="note"
+          >This browser can't make passkeys.</span>
+          <span
+            v-else-if="passkeysFull"
+            class="note"
+          >That's the limit of {{ MAX_PASSKEYS }} — remove one to add another.</span>
+          <span
+            class="note"
+            role="status"
+          >{{ passkeyMessage }}</span>
+        </div>
+        <p
+          v-if="passkeyError"
+          class="y-error msg"
+          role="alert"
+        >
+          {{ passkeyError }}
         </p>
       </section>
 
@@ -464,8 +624,7 @@ async function signOut () {
             Sign out everywhere else
           </button>
           <span
-            v-if="sessionsMessage"
-            class="y-tiny"
+            class="note"
             role="status"
           >{{ sessionsMessage }}</span>
         </div>
@@ -585,6 +744,11 @@ h1 { font-size: 26px; }
 .session-row .iconify { color: var(--teal); flex: none; }
 .session-name { font-weight: 700; font-size: 13.5px; }
 .session-meta { margin-left: auto; }
+.passkey-meta { font-size: 12.5px; color: var(--fg-muted); }
+.passkey-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+/* Status lines: always rendered so the live region exists before its text
+   changes, and --fg-muted rather than y-tiny's grey for 4.5:1. */
+.note { font-size: 12.5px; color: var(--fg-muted); }
 
 /* ---- palette swatches ---- */
 .palettes {

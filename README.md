@@ -5,8 +5,9 @@ on a single Cloudflare Worker (D1, KV, R2), with the parts every small app
 needs already built and hardened:
 
 - **Passwordless accounts** — magic links (15-minute, single-use, only the
-  SHA-256 digest stored), sessions as signed JWTs that name a revocable row,
-  and a "sign out everywhere else" button that actually works.
+  SHA-256 digest stored) to prove an email, then passkeys for one-tap sign-in
+  after that; sessions as signed JWTs that name a revocable row, and a "sign
+  out everywhere else" button that actually works.
 - **Profiles** — first/last name, an uploaded photo (R2) with Gravatar and
   initials as fallbacks, and seven colour palettes that re-tint the whole app.
 - **A first-visit walkthrough** — the home page walks a new person through
@@ -64,10 +65,10 @@ scripts/rename.sh        make rename NAME=…
 src/nuxt/
   app/                   pages, components, composables, layouts, middleware
   server/api/            auth, account, scratch (example)
-  server/utils/          session, auth-db, rate-limit, email, turnstile, origin
+  server/utils/          session, auth-db, passkeys, rate-limit, email, turnstile, origin
   server/middleware/     security headers + CSP nonce, origin check, body limit
   server/plugins/        csp-nonce (stamps the nonce onto rendered scripts)
-  server/db/schema.ts    users, login_tokens, sessions, feedback
+  server/db/schema.ts    users, login_tokens, sessions, passkeys, feedback
   shared/                app.ts (brand), types used on both sides
   modules/feedback/      the feedback feature as a local Nuxt module
   tests/unit, tests/e2e  vitest
@@ -78,10 +79,24 @@ Structure mirrors Plannrr / hivrr `v0`: root `makefile`, app in `src/nuxt`.
 
 ## Accounts
 
-Sign-in is passwordless: enter an email, get a magic link. Sessions are JWTs
-in an httpOnly, SameSite=Lax cookie, each naming a row in `sessions`;
-logging out deletes the row, so the cookie is dead immediately. The account
-page lists every signed-in browser and can revoke all the others.
+Sign-in is passwordless. Every account starts with an email: enter one, get
+a magic link, and owning the inbox is the proof. Right after that first
+link, a device that can hold a passkey offers to make one ("Not now" is
+remembered per browser), and the account page adds and removes them any
+time. From then on the sign-in page offers passkeys in the email field's
+autofill and behind a "Sign in with a passkey" button. The email link always
+works too, so removing every passkey never locks anyone out.
+
+Passkeys are discoverable WebAuthn credentials, verified with
+[SimpleWebAuthn](https://simplewebauthn.dev). Sign-in sends no email address
+first, so it reveals nothing about which accounts exist. Challenges are
+handed out signed and stateless, so showing the sign-in page writes nothing,
+and each is recorded as spent when used, so a response can't be replayed.
+
+Sessions are JWTs in an httpOnly, SameSite=Lax cookie, each naming a row in
+`sessions`; logging out deletes the row, so the cookie is dead immediately.
+The account page lists every signed-in browser and can revoke all the
+others.
 
 `NUXT_ADMIN_EMAILS` (comma-separated) decides who is admin — there is no role
 column. Admins see the feedback inbox and get feedback notifications.
@@ -159,7 +174,10 @@ npx wrangler --cwd .output dev --persist-to .output/server/.wrangler/state --var
 - **Set `NUXT_APP_ORIGIN`.** Production refuses to send magic links without
   it, because a link built from the request's Host header could be pointed at
   an attacker's domain by a spoofed proxy request. The same value is what
-  API writes check the browser's `Origin` header against.
+  API writes check the browser's `Origin` header against, and its hostname
+  is the domain every passkey is bound to: **move the app to a new domain
+  and existing passkeys stop working** (people sign in by email and add new
+  ones).
 - **CSP.** Scripts run only with the per-request nonce
   ([server/middleware/security.ts](src/nuxt/server/middleware/security.ts));
   `'strict-dynamic'` lets those trusted scripts load their own chunks. Inline
