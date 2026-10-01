@@ -112,7 +112,10 @@ async function skip () {
       </template>
       <template v-else>
         <h1>That link didn't work</h1>
-        <p class="y-error msg">
+        <p
+          class="y-error msg"
+          role="alert"
+        >
           {{ message }}
         </p>
         <NuxtLink

@@ -123,12 +123,14 @@ useHead({ title: 'Feedback inbox' })
     <p
       v-if="error"
       class="err"
+      role="alert"
     >
       Could not load feedback: {{ (error.data as { statusMessage?: string } | undefined)?.statusMessage ?? error.message }}
     </p>
     <p
       v-if="actionError"
       class="err"
+      role="alert"
     >
       {{ actionError }}
     </p>

@@ -387,12 +387,14 @@ async function signOut () {
             <p
               v-if="avatarError"
               class="y-error msg"
+              role="alert"
             >
               {{ avatarError }}
             </p>
             <p
               v-if="profileError"
               class="y-error msg"
+              role="alert"
             >
               {{ profileError }}
             </p>
@@ -455,6 +457,7 @@ async function signOut () {
         <p
           v-if="paletteError"
           class="y-error msg"
+          role="alert"
         >
           {{ paletteError }}
         </p>
@@ -537,14 +540,14 @@ async function signOut () {
           </button>
           <span
             v-if="passkeySupport === 'no'"
-            class="passkey-note"
+            class="note"
           >This browser can't make passkeys.</span>
           <span
             v-else-if="passkeysFull"
-            class="passkey-note"
+            class="note"
           >That's the limit of {{ MAX_PASSKEYS }} — remove one to add another.</span>
           <span
-            class="passkey-note"
+            class="note"
             role="status"
           >{{ passkeyMessage }}</span>
         </div>
@@ -621,8 +624,7 @@ async function signOut () {
             Sign out everywhere else
           </button>
           <span
-            v-if="sessionsMessage"
-            class="y-tiny"
+            class="note"
             role="status"
           >{{ sessionsMessage }}</span>
         </div>
@@ -744,7 +746,9 @@ h1 { font-size: 26px; }
 .session-meta { margin-left: auto; }
 .passkey-meta { font-size: 12.5px; color: var(--fg-muted); }
 .passkey-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-.passkey-note { font-size: 12.5px; color: var(--fg-muted); }
+/* Status lines: always rendered so the live region exists before its text
+   changes, and --fg-muted rather than y-tiny's grey for 4.5:1. */
+.note { font-size: 12.5px; color: var(--fg-muted); }
 
 /* ---- palette swatches ---- */
 .palettes {

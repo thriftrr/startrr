@@ -90,6 +90,7 @@ async function save () {
       <p
         v-if="error"
         class="y-error msg"
+        role="alert"
       >
         {{ error }}
       </p>
