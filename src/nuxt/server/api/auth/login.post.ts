@@ -22,15 +22,7 @@ export default defineEventHandler(async (event) => {
   const token = generateLoginToken()
   await insertLoginToken(hashLoginToken(token), email, loginTokenExpiry())
 
-  // The link's origin is pinned by NUXT_APP_ORIGIN in production: deriving it
-  // from the request would let a spoofed Host header (behind a plain reverse
-  // proxy) mail out a live token pointing at an attacker's domain.
-  const config = useRuntimeConfig()
-  if (!config.appOrigin && !import.meta.dev) {
-    throw createError({ statusCode: 500, statusMessage: 'NUXT_APP_ORIGIN is not set' })
-  }
-  const origin = (config.appOrigin || getRequestURL(event).origin).replace(/\/$/, '')
-  const link = `${origin}/auth/verify?token=${token}`
+  const link = `${publicOrigin(event)}/auth/verify?token=${token}`
 
   const message = magicLinkEmail({
     link,

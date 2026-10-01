@@ -18,6 +18,51 @@ const turnstile = ref<{ reset: () => void } | null>(null)
 const redirect = computed(() => safeRedirectPath(route.query.redirect))
 const canSend = computed(() => !sending.value && email.value.trim().length > 0 && (!turnstileSiteKey || turnstileToken.value))
 
+const { refresh } = useAuth()
+// Decided on mount: the server can't know what the browser supports.
+const passkeyReady = ref(false)
+const passkeyAutofill = ref(false)
+const passkeyBusy = ref(false)
+
+onMounted(async () => {
+  passkeyReady.value = passkeysSupported()
+  passkeyAutofill.value = passkeyReady.value && await passkeyAutofillSupported()
+  offerPasskeyAutofill()
+})
+
+onBeforeUnmount(cancelPasskeyRequest)
+
+// Saved passkeys show up in the email field's autofill
+// (autocomplete="… webauthn"), so someone who has one never has to find the
+// button. The request stays open until they pick one or we close it.
+function offerPasskeyAutofill () {
+  if (passkeyAutofill.value && !sent.value) passkeySignIn(true)
+}
+
+async function passkeySignIn (autofill: boolean) {
+  if (!autofill) {
+    passkeyBusy.value = true
+    error.value = ''
+  }
+  try {
+    await signInWithPasskey(autofill)
+    await refresh()
+    // Clear any destination remembered for a link that's no longer needed.
+    const remembered = takeAfterLogin()
+    await navigateTo(redirect.value || remembered || '/')
+  } catch (cause: unknown) {
+    if (isPasskeyAbort(cause)) return
+    const message = passkeyErrorMessage(cause, autofill ? '' : 'No passkey was used. Pick one, or get an email link instead.')
+    if (message) error.value = message
+    // The button's prompt replaced the autofill offer, so put it back. After
+    // an autofill attempt, only re-offer when the server said no (expired,
+    // removed passkey) — a browser-side refusal would just repeat at once.
+    if (!autofill || isPasskeyServerError(cause)) offerPasskeyAutofill()
+  } finally {
+    if (!autofill) passkeyBusy.value = false
+  }
+}
+
 async function submit () {
   if (!canSend.value) return
   sending.value = true
@@ -30,6 +75,7 @@ async function submit () {
     sent.value = true
     devLink.value = data.devLink ?? ''
     rememberAfterLogin(redirect.value)
+    cancelPasskeyRequest()
   } catch (cause: unknown) {
     const err = cause as { data?: { statusMessage?: string } }
     error.value = err.data?.statusMessage ?? 'Something went wrong — try again.'
@@ -40,10 +86,13 @@ async function submit () {
   }
 }
 
-function reset () {
+async function reset () {
   sent.value = false
   devLink.value = ''
   turnstile.value?.reset()
+  // The email field is back; the autofill offer needs it in the page.
+  await nextTick()
+  offerPasskeyAutofill()
 }
 </script>
 
@@ -61,9 +110,10 @@ function reset () {
       v-if="!sent"
       class="panel"
     >
-      <h1>Sign in with email</h1>
+      <h1>Sign in</h1>
       <p class="y-body">
-        No password — we'll email you a sign-in link that's valid for 15 minutes.
+        No password — we'll email you a sign-in link that's valid for 15 minutes,
+        or use a passkey if you've added one.
       </p>
       <!-- method="dialog": before hydration attaches the Vue handler, a native
            submit would GET /login and reload the page, wiping the form. A
@@ -80,7 +130,7 @@ function reset () {
           required
           placeholder="you@example.com"
           aria-label="Email address"
-          autocomplete="email"
+          autocomplete="username webauthn"
         >
         <TurnstileWidget
           ref="turnstile"
@@ -94,9 +144,31 @@ function reset () {
           {{ sending ? 'Sending…' : 'Email me a link' }}
         </button>
       </form>
+      <template v-if="passkeyReady">
+        <div
+          class="or"
+          aria-hidden="true"
+        >
+          or
+        </div>
+        <button
+          class="y-btn-outline passkey"
+          type="button"
+          :disabled="passkeyBusy"
+          @click="passkeySignIn(false)"
+        >
+          <Icon
+            name="lucide:key-round"
+            size="16"
+            aria-hidden="true"
+          />
+          {{ passkeyBusy ? 'Waiting for your passkey…' : 'Sign in with a passkey' }}
+        </button>
+      </template>
       <p
         v-if="error"
         class="y-error err"
+        role="alert"
       >
         {{ error }}
       </p>
@@ -148,6 +220,24 @@ h1 { font-size: 18px; }
 .panel p { margin: 8px 0 0; }
 form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .send { padding: 11px 13px; font-size: 14px; }
+.or {
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+}
+.or::before, .or::after { content: ''; flex: 1; border-top: 1px solid var(--border-soft); }
+.passkey {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 13px;
+  font-size: 14px;
+}
 .err { margin-top: 12px; font-size: 13.5px; }
 .dev { margin-top: 14px; }
 .dev-url { word-break: break-all; font-weight: 700; }

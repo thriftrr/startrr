@@ -74,9 +74,15 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2025-07-15',
 
-  // Worker name for the Cloudflare build (otherwise nitro invents one).
   nitro: {
-    cloudflare: { wrangler: { name: process.env.NUXT_CF_WORKER_NAME || APP_SLUG } }
+    // Worker name for the Cloudflare build (otherwise nitro invents one).
+    cloudflare: { wrangler: { name: process.env.NUXT_CF_WORKER_NAME || APP_SLUG } },
+    // Nitro tree-shakes every package import it isn't told has side effects.
+    // @simplewebauthn/server imports reflect-metadata purely for its Reflect
+    // polyfill, which tsyringe (via @peculiar/x509) checks for at load time —
+    // dropped, the production worker throws before serving a single request.
+    // Dev runs unbundled, so only a production build shows it.
+    moduleSideEffects: ['reflect-metadata/']
   },
 
   hub: {

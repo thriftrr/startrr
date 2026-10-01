@@ -1,8 +1,9 @@
 import type { H3Event } from 'h3'
 
 // Admin is decided by email alone (NUXT_ADMIN_EMAILS, comma-separated) — no
-// role column, no UI to grant it. Sign-in is by magic link, so owning the
-// address IS the proof.
+// role column, no UI to grant it. Every account starts with a magic link
+// (passkeys are only added from a signed-in session), so owning the address
+// IS the proof.
 export function adminEmails (): string[] {
   const { adminEmails: raw } = useRuntimeConfig()
   return String(raw ?? '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)

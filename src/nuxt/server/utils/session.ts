@@ -21,7 +21,8 @@ export interface SessionUser {
 // One lookup per request, however many handlers ask.
 const resolved = new WeakMap<H3Event, SessionUser | null>()
 
-function sessionSecret () {
+// Also signs passkey challenges (utils/passkeys.ts), under their own audience.
+export function sessionSecret () {
   const { sessionSecret: secret } = useRuntimeConfig()
   if (secret) return new TextEncoder().encode(secret)
   if (import.meta.dev) return new TextEncoder().encode(`${APP_SLUG}-dev-session-secret-not-for-production`)

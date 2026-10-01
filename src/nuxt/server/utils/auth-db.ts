@@ -149,3 +149,67 @@ export async function listUserSessions (userId: string): Promise<SessionRow[]> {
     .where(and(eq(schema.sessions.userId, userId), gt(schema.sessions.expiresAt, nowIso())))
     .all()
 }
+
+// ---- Passkeys ----------------------------------------------------------------
+
+export interface PasskeyRow {
+  id: string
+  userId: string
+  publicKey: string
+  counter: number
+  transports: string
+  backedUp: boolean
+  aaguid: string
+  userAgent: string
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export async function listUserPasskeys (userId: string): Promise<PasskeyRow[]> {
+  return await db.select().from(schema.passkeys)
+    .where(eq(schema.passkeys.userId, userId))
+    .orderBy(schema.passkeys.createdAt)
+    .all()
+}
+
+export async function countUserPasskeys (userId: string): Promise<number> {
+  const row = await db.select({ n: sql<number>`count(*)` }).from(schema.passkeys)
+    .where(eq(schema.passkeys.userId, userId))
+    .get()
+  return row?.n ?? 0
+}
+
+export async function findPasskey (id: string): Promise<PasskeyRow | null> {
+  return await db.select().from(schema.passkeys).where(eq(schema.passkeys.id, id)).get() ?? null
+}
+
+// False when the credential is already registered — to anyone.
+export async function insertPasskey (row: PasskeyRow): Promise<boolean> {
+  const rows = await db.insert(schema.passkeys).values(row).onConflictDoNothing()
+    .returning({ id: schema.passkeys.id })
+  return rows.length > 0
+}
+
+export async function recordPasskeyUse (id: string, counter: number, backedUp: boolean): Promise<void> {
+  await db.update(schema.passkeys)
+    .set({ counter, backedUp, lastUsedAt: nowIso() })
+    .where(eq(schema.passkeys.id, id))
+    .run()
+}
+
+// Scoped to the owner, so a guessed id can't remove someone else's passkey.
+export async function deleteUserPasskey (userId: string, id: string): Promise<boolean> {
+  const rows = await db.delete(schema.passkeys)
+    .where(and(eq(schema.passkeys.userId, userId), eq(schema.passkeys.id, id)))
+    .returning({ id: schema.passkeys.id })
+  return rows.length > 0
+}
+
+// Records a WebAuthn challenge as answered. False when it already was: the
+// primary key turns a replay into a conflict, atomically.
+export async function spendPasskeyChallenge (challenge: string, expiresAt: string): Promise<boolean> {
+  await db.delete(schema.passkeyChallenges).where(lt(schema.passkeyChallenges.expiresAt, nowIso())).run()
+  const rows = await db.insert(schema.passkeyChallenges).values({ challenge, expiresAt }).onConflictDoNothing()
+    .returning({ challenge: schema.passkeyChallenges.challenge })
+  return rows.length > 0
+}
