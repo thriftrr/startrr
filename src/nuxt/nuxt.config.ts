@@ -86,6 +86,9 @@ export default defineNuxtConfig({
   },
 
   hub: {
+    // Local storage in dev. The e2e suite points HUB_DIR elsewhere so its
+    // accounts stay out of the database `make up` uses (see tests/e2e).
+    dir: process.env.HUB_DIR || '.data',
     cache: true,
     db: 'sqlite',
     kv: true,

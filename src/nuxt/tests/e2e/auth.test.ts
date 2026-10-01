@@ -10,11 +10,16 @@ import { createPasskey, usePasskey } from './soft-authenticator'
 // prove it can't be spent twice, prove the session cookie is bound to a
 // same-origin browser, then sign out and prove the cookie is dead.
 describe('passwordless sign-in', async () => {
+  // Keep test users out of the dev database. In dev mode test-utils runs
+  // the server as its own `nuxi dev` process, which inherits `env` but never
+  // sees `nuxtConfig` — so the directory goes to both: env for the server
+  // under test, nuxtConfig for the Nuxt instance test-utils loads in-process.
+  const dataDir = '.data/test'
   await setup({
     rootDir: fileURLToPath(new URL('../..', import.meta.url)),
     dev: true,
-    // Keep test users out of the dev database.
-    nuxtConfig: { hub: { dir: '.data/test' } }
+    env: { HUB_DIR: dataDir },
+    nuxtConfig: { hub: { dir: dataDir } }
   })
 
   const json = { 'content-type': 'application/json' }
