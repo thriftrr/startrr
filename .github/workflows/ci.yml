@@ -25,3 +25,6 @@ jobs:
       # A production build with the feedback module compiled out, so the
       # build-time flag keeps working.
       - run: NUXT_FEATURE_FEEDBACK=0 npm run build
+      # The Cloudflare build, booted in workerd and asked a few questions: a
+      # build that succeeds can still ship a worker that throws on load.
+      - run: bash scripts/smoke.sh
