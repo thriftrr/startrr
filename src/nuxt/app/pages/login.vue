@@ -5,7 +5,7 @@ definePageMeta({ layout: 'auth' })
 useHead({ title: 'Sign in' })
 
 const route = useRoute()
-const { public: { turnstileSiteKey } } = useRuntimeConfig()
+const { public: { turnstileSiteKey, authrrIssuer } } = useRuntimeConfig()
 
 const email = ref('')
 const sending = ref(false)
@@ -16,6 +16,17 @@ const turnstileToken = ref('')
 const turnstile = ref<{ reset: () => void } | null>(null)
 
 const redirect = computed(() => safeRedirectPath(route.query.redirect))
+
+// ---- Accounts through Authrr --------------------------------------------------
+// With NUXT_PUBLIC_AUTHRR_ISSUER set there's nothing to fill in here: go
+// straight on to Authrr. Stay only to show why the last attempt failed, or
+// after signing out (going straight back would sign them in again).
+const authrrStart = computed(() => `/auth/authrr/start${redirect.value ? `?${new URLSearchParams({ redirect: redirect.value })}` : ''}`)
+const authrrError = computed(() => route.query.error ? authrrErrorMessage(route.query.error) : '')
+const signedOut = computed(() => route.query.signedOut !== undefined)
+if (authrrIssuer && !authrrError.value && !signedOut.value) {
+  await navigateTo(authrrStart.value, { external: true, replace: true })
+}
 const canSend = computed(() => !sending.value && email.value.trim().length > 0 && (!turnstileSiteKey || turnstileToken.value))
 
 const { refresh } = useAuth()
@@ -25,6 +36,7 @@ const passkeyAutofill = ref(false)
 const passkeyBusy = ref(false)
 
 onMounted(async () => {
+  if (authrrIssuer) return
   passkeyReady.value = passkeysSupported()
   passkeyAutofill.value = passkeyReady.value && await passkeyAutofillSupported()
   offerPasskeyAutofill()
@@ -107,7 +119,29 @@ async function reset () {
     </div>
 
     <section
-      v-if="!sent"
+      v-if="authrrIssuer"
+      class="panel"
+    >
+      <h1>{{ signedOut ? 'You\'re signed out' : 'Sign in' }}</h1>
+      <p class="y-body">
+        {{ APP_NAME }} uses your thriftrr account — the same email link or
+        passkey as every other thriftrr app.
+      </p>
+      <a
+        :href="authrrStart"
+        class="y-btn send authrr-go"
+      >Continue with Authrr</a>
+      <p
+        v-if="authrrError"
+        class="y-error err"
+        role="alert"
+      >
+        {{ authrrError }}
+      </p>
+    </section>
+
+    <section
+      v-else-if="!sent"
       class="panel"
     >
       <h1>Sign in</h1>
@@ -220,6 +254,7 @@ h1 { font-size: 18px; }
 .panel p { margin: 8px 0 0; }
 form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .send { padding: 11px 13px; font-size: 14px; }
+.authrr-go { margin-top: 18px; display: block; text-align: center; text-decoration: none; }
 .or {
   margin: 16px 0;
   display: flex;

@@ -17,7 +17,10 @@ ORIGIN="http://localhost:$PORT"
 STATE="$(mktemp -d)"
 LOG="$STATE/wrangler.log"
 WRANGLER=""
-trap '[ -n "$WRANGLER" ] && kill "$WRANGLER" 2>/dev/null; rm -rf "$STATE"' EXIT
+# wrangler runs in its own process group (setsid below) so this takes
+# workerd down with it — killing just npx left a worker squatting on $PORT,
+# answering the next run's requests.
+trap '[ -n "$WRANGLER" ] && kill -- "-$WRANGLER" 2>/dev/null; rm -rf "$STATE"' EXIT
 
 fail () {
   echo "✘ $1"
@@ -35,7 +38,7 @@ npx wrangler --cwd .output/server d1 migrations apply DB --local --persist-to "$
   || { tail -40 "$STATE/migrate.log"; fail "migrations"; }
 
 echo "── wrangler dev on :$PORT"
-npx wrangler --cwd .output dev --port "$PORT" --persist-to "$STATE" \
+setsid npx wrangler --cwd .output dev --port "$PORT" --persist-to "$STATE" \
   --var "NUXT_SESSION_SECRET:smoke-test-only" --var "NUXT_APP_ORIGIN:$ORIGIN" >"$LOG" 2>&1 &
 WRANGLER=$!
 

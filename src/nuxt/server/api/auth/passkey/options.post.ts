@@ -4,6 +4,8 @@ import { generateAuthenticationOptions } from '@simplewebauthn/server'
 // whichever passkeys it holds for this site (the account is identified by
 // the one picked), so nothing here reveals whether an address has an account.
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const { rpID } = relyingParty(event)
   const options = await generateAuthenticationOptions({ rpID, userVerification: PASSKEY_USER_VERIFICATION })
   return { options, challengeToken: await issueChallengeToken('login', options.challenge) }

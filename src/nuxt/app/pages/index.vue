@@ -13,6 +13,10 @@ const greeting = computed(() => {
 // "Skip for now" (remembered server-side).
 const skipBusy = ref(false)
 
+// With Authrr, name and photo are set there — so those steps point there.
+const { public: { authrrIssuer } } = useRuntimeConfig()
+const profileHome = authrrIssuer ? `${String(authrrIssuer).replace(/\/$/, '')}/account#profile` : '/account#profile'
+
 const setupSteps = computed(() => {
   const u = user.value
   if (!u) return []
@@ -22,7 +26,7 @@ const setupSteps = computed(() => {
       done: Boolean(u.avatarUrl),
       title: 'Add a profile picture',
       blurb: 'Upload a photo — or skip this one: without an upload we show your Gravatar (the picture tied to your email), or your initials if there isn\'t one.',
-      to: '/account#profile',
+      to: profileHome,
       cta: 'Upload a photo'
     },
     {
@@ -30,7 +34,7 @@ const setupSteps = computed(() => {
       done: Boolean(u.firstName),
       title: 'Tell us your name',
       blurb: 'So the greeting up top can say hi properly.',
-      to: '/account#profile',
+      to: profileHome,
       cta: 'Add your name'
     },
     {

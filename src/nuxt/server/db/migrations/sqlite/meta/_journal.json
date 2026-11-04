@@ -15,6 +15,13 @@
       "when": 1790861303516,
       "tag": "0001_naive_loa",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793745173157,
+      "tag": "0002_colossal_masque",
+      "breakpoints": true
     }
   ]
 }

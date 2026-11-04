@@ -5,7 +5,10 @@ import type { PasskeyList, PasskeySummary } from '#shared/types/passkey'
 
 useHead({ title: 'Account' })
 
-const { user, loaded, refresh, logout } = useAuth()
+const { user, loaded, refresh, logout, displayName } = useAuth()
+// With Authrr running accounts, name, photo and passkeys live there.
+const { public: { authrrIssuer } } = useRuntimeConfig()
+const authrrAccount = authrrIssuer ? `${String(authrrIssuer).replace(/\/$/, '')}/account` : ''
 
 // ---- Profile ---------------------------------------------------------------
 const firstName = ref('')
@@ -32,7 +35,7 @@ onMounted(async () => {
   if (!user.value) return
   syncFromUser()
   passkeySupport.value = passkeysSupported() ? 'yes' : 'no'
-  await Promise.all([loadSessions(), loadPasskeys()])
+  await Promise.all([loadSessions(), authrrIssuer ? null : loadPasskeys()])
 })
 
 async function saveProfile () {
@@ -255,7 +258,6 @@ async function revokeOthers () {
 
 async function signOut () {
   await logout()
-  await navigateTo('/login')
 }
 </script>
 
@@ -285,6 +287,50 @@ async function signOut () {
 
     <template v-else-if="user">
       <section
+        v-if="authrrIssuer"
+        id="profile"
+        class="y-card"
+      >
+        <div class="y-card-title">
+          Profile
+        </div>
+        <div class="profile-body">
+          <div class="avatar-col">
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              alt="Profile picture"
+              width="84"
+              height="84"
+              class="avatar"
+            >
+            <span
+              v-else
+              class="avatar initials"
+            >{{ initials }}</span>
+          </div>
+          <div class="profile-fields">
+            <div class="managed-name">
+              {{ [user.firstName, user.lastName].filter(Boolean).join(' ') || displayName }}
+            </div>
+            <div class="y-small">
+              {{ user.email }}
+            </div>
+            <p class="hint">
+              Your name, photo, email and passkeys belong to your thriftrr
+              account, so every thriftrr app shows the same ones. Changes there
+              show up here within the hour.
+            </p>
+            <a
+              :href="authrrAccount"
+              class="y-btn-outline managed-link"
+            >Edit in Authrr →</a>
+          </div>
+        </div>
+      </section>
+
+      <section
+        v-else
         id="profile"
         class="y-card"
       >
@@ -464,6 +510,7 @@ async function signOut () {
       </section>
 
       <section
+        v-if="!authrrIssuer"
         id="passkeys"
         class="y-card"
       >
@@ -636,6 +683,8 @@ async function signOut () {
 </template>
 
 <style scoped>
+.managed-name { font-size: 17px; font-weight: 800; }
+.managed-link { margin-top: 12px; display: inline-flex; text-decoration: none; }
 .page {
   flex: 1;
   min-width: 0;

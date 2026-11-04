@@ -12,13 +12,13 @@ import { randomBytes } from 'node:crypto'
 // run code, so the trade is a small one.
 //
 // The CSP is production-only (dev needs Vite's websocket + eval).
-function csp (nonce: string): string {
+function csp (nonce: string, extraImg: string): string {
   return [
     'default-src \'self\'',
     `script-src 'nonce-${nonce}' 'strict-dynamic'`,
     'style-src \'self\' \'unsafe-inline\'',
     // Gravatar for avatars; add hosts here when you hotlink other images.
-    'img-src \'self\' data: blob: https://www.gravatar.com',
+    `img-src 'self' data: blob: https://www.gravatar.com${extraImg}`,
     'font-src \'self\' data:',
     'connect-src \'self\'',
     // Turnstile renders its challenge in an iframe.
@@ -28,6 +28,17 @@ function csp (nonce: string): string {
     'form-action \'self\'',
     'object-src \'none\''
   ].join('; ')
+}
+
+// Profile photos come from Authrr when sign-in goes through it.
+function authrrImgSource (): string {
+  const { public: { authrrIssuer } } = useRuntimeConfig()
+  if (!authrrIssuer) return ''
+  try {
+    return ` ${new URL(String(authrrIssuer)).origin}`
+  } catch {
+    return ''
+  }
 }
 
 export default defineEventHandler((event) => {
@@ -44,7 +55,7 @@ export default defineEventHandler((event) => {
       ? {}
       : {
           'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-          'Content-Security-Policy': csp(nonce)
+          'Content-Security-Policy': csp(nonce, authrrImgSource())
         })
   })
 })

@@ -3,6 +3,8 @@ import type { AuthenticationResponseJSON } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   // A signature can't be guessed, so this only keeps the endpoint from
   // being hammered for free — the same budget as the magic-link verifier.
   await assertRateLimit([{ key: `passkey-ip:${clientIp(event)}`, limit: 30, windowSeconds: 600 }])

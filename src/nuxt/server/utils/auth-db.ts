@@ -19,6 +19,9 @@ export interface DbUser {
   avatarKey: string | null
   palette: string | null
   onboardingDismissedAt: string | null
+  authrrSub: string | null
+  role: string | null
+  pictureUrl: string | null
 }
 
 // Hard ceiling on accounts: with open magic-link signup this is what bounds
@@ -37,7 +40,7 @@ export async function ensureUser (email: string): Promise<DbUser> {
   }
   const id = crypto.randomUUID()
   await db.insert(schema.users).values({ id, email }).run()
-  return { id, email, firstName: null, lastName: null, avatarKey: null, palette: null, onboardingDismissedAt: null }
+  return { id, email, firstName: null, lastName: null, avatarKey: null, palette: null, onboardingDismissedAt: null, authrrSub: null, role: null, pictureUrl: null }
 }
 
 export async function getUserById (id: string): Promise<DbUser | null> {
@@ -46,6 +49,25 @@ export async function getUserById (id: string): Promise<DbUser | null> {
 
 export async function getUserByEmail (email: string): Promise<DbUser | null> {
   return await db.select().from(schema.users).where(eq(schema.users.email, email)).get() ?? null
+}
+
+export async function getUserByAuthrrSub (sub: string): Promise<DbUser | null> {
+  return await db.select().from(schema.users).where(eq(schema.users.authrrSub, sub)).get() ?? null
+}
+
+// What Authrr says about someone, copied onto the local row at every sign-in
+// and session check. Authrr owns these fields; the local copy is a cache.
+export interface AuthrrProfilePatch {
+  authrrSub?: string
+  email?: string
+  firstName: string | null
+  lastName: string | null
+  pictureUrl: string | null
+  role: string
+}
+
+export async function applyAuthrrProfile (id: string, patch: AuthrrProfilePatch): Promise<void> {
+  await db.update(schema.users).set(patch).where(eq(schema.users.id, id)).run()
 }
 
 export interface ProfilePatch {

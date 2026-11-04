@@ -6,8 +6,14 @@ import { APP_SLUG } from '#shared/app'
 // off-site.
 const KEY = `${APP_SLUG}:after-login`
 
-export function safeRedirectPath (value: unknown): string {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : ''
+// safeRedirectPath lives in shared/utils/redirect.ts (the server needs it
+// too).
+
+// Lands on a post-sign-in destination, whether it's a page or the
+// /oauth/authorize request an app is waiting on.
+export function goAfterLogin (path: string) {
+  const target = path || '/'
+  return navigateTo(target, { external: isServerPath(target), replace: true })
 }
 
 export function rememberAfterLogin (path: string) {
