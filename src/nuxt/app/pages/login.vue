@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { APP_NAME, APP_TAGLINE } from '#shared/app'
+import { APP_NAME, APP_SCHEME, APP_TAGLINE } from '#shared/app'
 
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Sign in' })
@@ -22,7 +22,14 @@ const redirect = computed(() => safeRedirectPath(route.query.redirect))
 // window over this page (utils/authrr-popup.ts), and this page carries on
 // once it closes. A browser that won't open the window gets the plain
 // redirect: the same link, followed in this tab.
-const authrrStart = computed(() => `/auth/authrr/start${redirect.value ? `?${new URLSearchParams({ redirect: redirect.value })}` : ''}`)
+// The palette in use and this app's scheme ride along, so the Authrr
+// window looks like this app rather than Authrr.
+const { palette: currentPalette } = usePalette()
+const authrrStart = computed(() => `/auth/authrr/start?${new URLSearchParams({
+  ...(redirect.value ? { redirect: redirect.value } : {}),
+  theme: currentPalette.value,
+  scheme: APP_SCHEME
+})}`)
 const authrrError = ref(route.query.error ? authrrErrorMessage(route.query.error) : '')
 const signedOut = computed(() => route.query.signedOut !== undefined)
 const authrrWaiting = ref(false)
@@ -31,7 +38,7 @@ let stopAuthrr = () => {}
 async function signInWithAuthrr () {
   authrrError.value = ''
   stopAuthrr()
-  const popupUrl = `${authrrStart.value}${authrrStart.value.includes('?') ? '&' : '?'}popup=1`
+  const popupUrl = `${authrrStart.value}&popup=1`
   const { opened, stop } = openAuthrrPopup(popupUrl, async (message) => {
     authrrWaiting.value = false
     if (message.type === 'error') {
@@ -307,6 +314,10 @@ h1 { font-size: 18px; }
 form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .send { padding: 11px 13px; font-size: 14px; }
 .authrr-go { margin-top: 18px; display: block; text-align: center; text-decoration: none; }
+/* An <a> styled as a button: a:hover's link colour would otherwise win and
+   hide the label on the button's own hover colour. */
+.authrr-go, .authrr-go:hover { color: #fff; }
+.authrr-go[aria-disabled="true"] { opacity: 0.75; cursor: default; }
 .waiting { margin: 10px 0 0; text-align: center; }
 .or {
   margin: 16px 0;
