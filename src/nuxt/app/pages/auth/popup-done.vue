@@ -11,8 +11,15 @@ const route = useRoute()
 const next = safeRedirectPath(route.query.next) || '/'
 const error = typeof route.query.error === 'string' ? route.query.error : ''
 const stuck = ref(false)
+const { user, refresh } = useAuth()
 
-onMounted(() => {
+onMounted(async () => {
+  // Anyone can link here, so "signed in" is only said once the session
+  // says so; a crafted link just lands on the sign-in page.
+  if (!error) {
+    await refresh()
+    if (!user.value) return navigateTo('/login', { replace: true })
+  }
   announceAuthrrResult(error ? { type: 'error', code: error } : { type: 'signed-in', next })
   window.close()
   // Still here: not a window we opened, so nothing will close it.

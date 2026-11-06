@@ -43,6 +43,8 @@ export function isBuiltinSetting (key: string): key is BuiltinSetting {
 // it". The photo is never written as a value: it has its own upload.
 export function cleanSettingValue (key: string, value: unknown): { ok: true, value: unknown } | { ok: false, reason: string } {
   if (!SETTING_KEY_RE.test(key)) return { ok: false, reason: 'Setting names are lowercase words joined by dots, like pokrr.buy_in' }
+  // 'constructor' and friends would read as Object.prototype's own.
+  if (key in Object.prototype) return { ok: false, reason: 'That name is taken' }
   if (key === 'photo') return { ok: false, reason: 'Upload a photo instead' }
   if (value === null) return { ok: true, value: null }
   switch (key) {
@@ -73,14 +75,21 @@ export function cleanSettingValue (key: string, value: unknown): { ok: true, val
   return { ok: true, value }
 }
 
+// Who may set a key for every app: the built-ins, any app; otherwise only
+// the app it's named for (`pokrr.` keys are Pokrr's), so one app can't
+// change — or crowd out — another's.
+export function mayWriteGlobal (key: string, appId: string): boolean {
+  return isBuiltinSetting(key) || key.startsWith(`${appId}.`)
+}
+
 // Lays a person's global values and one app's overrides out as what that
 // app sees. `undefined` means "not set" on either side.
 export function resolveSettings (global: Record<string, unknown>, overrides: Record<string, unknown>): SettingsMap {
   const out: SettingsMap = {}
   const keys = new Set([...BUILTIN_SETTINGS, ...Object.keys(global), ...Object.keys(overrides)])
   for (const key of keys) {
-    const g = global[key] ?? null
-    const o = overrides[key]
+    const g = Object.hasOwn(global, key) ? global[key] ?? null : null
+    const o = Object.hasOwn(overrides, key) ? overrides[key] : undefined
     out[key] = o !== undefined
       ? { value: o, from: 'app', global: g, override: o }
       : { value: g, from: g === null ? null : 'global', global: g, override: null }

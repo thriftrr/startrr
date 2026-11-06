@@ -25,6 +25,8 @@ export default defineEventHandler(async (event) => {
   // Through Authrr, name and palette are settings there (server/utils/
   // settings.ts): for every app, or with scope 'app' just this one.
   if (authrrEnabled()) {
+    // Each field is a call to Authrr, whose budget this app shares.
+    await assertRateLimit([{ key: `settings:${user.id}`, limit: 120, windowSeconds: 600 }])
     const scope = body?.scope === 'app' ? 'app' : 'global'
     if (body?.firstName !== undefined) await setSetting(event, user.id, 'name.first', cleanName(body.firstName), scope)
     if (body?.lastName !== undefined) await setSetting(event, user.id, 'name.last', cleanName(body.lastName), scope)

@@ -39,5 +39,6 @@ describe('setting values', () => {
     expect(cleanSettingValue('Bad Key', 1).ok).toBe(false)
     expect(cleanSettingValue('a.b.c.d.e', 1).ok).toBe(false)
     expect(cleanSettingValue('pokrr.x', null)).toEqual({ ok: true, value: null })
+    expect(cleanSettingValue('constructor', 1).ok).toBe(false)
   })
 })

@@ -1,7 +1,7 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { SettingScope, SettingsMap } from '#shared/types/settings'
-import { cleanSettingValue, resolveSettings } from '#shared/types/settings'
+import { MAX_SETTINGS_PER_SCOPE, cleanSettingValue, resolveSettings } from '#shared/types/settings'
 import { isPaletteId } from '#shared/types/palette'
 
 // Settings that follow a person (shared/types/settings.ts): name, photo,
@@ -98,6 +98,11 @@ export async function wantsNotificationEmailsAt (event: H3Event, email: string):
 export async function setSetting (event: H3Event, userId: string, key: string, value: unknown, scope: SettingScope = 'global'): Promise<SettingsMap> {
   const clean = cleanSettingValue(key, value)
   if (!clean.ok) throw createError({ statusCode: 400, statusMessage: clean.reason })
+  // Authrr takes any palette name (each app has its own list); from here,
+  // only one this app has.
+  if (key === 'palette' && clean.value !== null && !isPaletteId(clean.value)) {
+    throw createError({ statusCode: 400, statusMessage: 'Unknown colour palette' })
+  }
 
   if (authrrEnabled()) {
     const { settings } = await authrrApi<{ settings: SettingsMap }>(event, '/oauth/settings/write', {
@@ -107,15 +112,18 @@ export async function setSetting (event: H3Event, userId: string, key: string, v
     return settings
   }
 
-  if (key === 'palette' && clean.value !== null && !isPaletteId(clean.value)) {
-    throw createError({ statusCode: 400, statusMessage: 'Unknown colour palette' })
-  }
   if (key === 'name.first') await updateUserProfile(userId, { firstName: clean.value as string | null })
   else if (key === 'name.last') await updateUserProfile(userId, { lastName: clean.value as string | null })
   else if (key === 'palette') await updateUserProfile(userId, { palette: clean.value as string | null })
   else if (clean.value === null) {
     await db.delete(schema.userSettings).where(and(eq(schema.userSettings.userId, userId), eq(schema.userSettings.key, key))).run()
   } else {
+    const others = await db.select({ n: sql<number>`count(*)` }).from(schema.userSettings)
+      .where(and(eq(schema.userSettings.userId, userId), ne(schema.userSettings.key, key)))
+      .get()
+    if ((others?.n ?? 0) >= MAX_SETTINGS_PER_SCOPE) {
+      throw createError({ statusCode: 400, statusMessage: `Up to ${MAX_SETTINGS_PER_SCOPE} settings` })
+    }
     const json = JSON.stringify(clean.value)
     await db.insert(schema.userSettings).values({ userId, key, value: json })
       .onConflictDoUpdate({ target: [schema.userSettings.userId, schema.userSettings.key], set: { value: json, updatedAt: new Date().toISOString() } })

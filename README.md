@@ -180,7 +180,9 @@ if (await wantsNotificationEmails(event, user.id)) { /* send it */ }
 Through Authrr they're stored there, layered as above; running its own
 accounts there's only this app, so the scope makes no difference and they
 live in `users` and `user_settings`. Keys are lowercase words joined by
-dots; prefix an app's own with its slug. The browser can change the
+dots; prefix an app's own with its slug. Through Authrr, only the app a
+key is named for can set it everywhere or see its everywhere value, so
+register the app in Authrr under its slug as the client id (`startrr`). The browser can change the
 built-ins and this app's own keys through `PATCH /api/account/settings`;
 server code can set anything. Name, palette and photo URL are also copied
 onto `users`, so pages render them without a round trip; the copy is

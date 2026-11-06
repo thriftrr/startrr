@@ -7,6 +7,8 @@ const MAX_BYTES = 1024 * 1024 // 1MB
 
 export default defineEventHandler(async (event) => {
   const session = await requireUser(event)
+  // Each call may go on to Authrr, whose budget this app shares.
+  await assertRateLimit([{ key: `settings:${session.id}`, limit: 120, windowSeconds: 600 }])
 
   const form = await readMultipartFormData(event)
   const file = form?.find(part => part.name === 'file' && part.filename)
