@@ -9,13 +9,14 @@ export default defineEventHandler(async (event) => {
   return {
     user: {
       email: user.email,
-      isAdmin: isAdminEmail(user.email),
+      isAdmin: isAdminUser(user),
       firstName: user.firstName,
       lastName: user.lastName,
       palette: user.palette ?? null,
       onboardingDismissedAt: user.onboardingDismissedAt ?? null,
       // Cache-bust on the key so a replaced photo shows up immediately.
-      avatarUrl: user.avatarKey ? `/api/account/avatar?v=${encodeURIComponent(user.avatarKey)}` : null
+      // An upload here wins; then Authrr's photo; then the page's Gravatar.
+      avatarUrl: user.avatarKey ? `/api/account/avatar?v=${encodeURIComponent(user.avatarKey)}` : user.pictureUrl ?? null
     }
   }
 })

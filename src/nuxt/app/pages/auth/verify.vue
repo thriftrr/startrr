@@ -30,7 +30,7 @@ onMounted(async () => {
       state.value = 'offer'
       return
     }
-    await navigateTo(next.value)
+    await goAfterLogin(next.value)
   } catch (cause: unknown) {
     const err = cause as { data?: { statusMessage?: string } }
     state.value = 'error'
@@ -44,7 +44,7 @@ async function add () {
   message.value = ''
   try {
     await addPasskey()
-    await navigateTo(next.value)
+    await goAfterLogin(next.value)
   } catch (cause: unknown) {
     message.value = passkeyErrorMessage(cause, 'No passkey was saved. Try again, or skip it for now.')
   } finally {
@@ -54,7 +54,7 @@ async function add () {
 
 async function skip () {
   dismissPasskeyOffer()
-  await navigateTo(next.value)
+  await goAfterLogin(next.value)
 }
 </script>
 

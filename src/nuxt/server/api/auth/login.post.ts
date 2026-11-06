@@ -1,7 +1,9 @@
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody<{ email?: string, turnstile?: string }>(event)
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
+  const body = await readBody<{ email?: string, turnstile?: string, redirect?: string }>(event)
   const email = body?.email?.trim().toLowerCase()
   if (!email || !EMAIL_RE.test(email) || email.length > 254) {
     throw createError({ statusCode: 400, statusMessage: 'A valid email is required' })
@@ -22,7 +24,12 @@ export default defineEventHandler(async (event) => {
   const token = generateLoginToken()
   await insertLoginToken(hashLoginToken(token), email, loginTokenExpiry())
 
-  const link = `${publicOrigin(event)}/auth/verify?token=${token}`
+  // Where to land afterwards rides in the link itself: the email is often
+  // opened in another tab or browser, where the sign-in page's memory of it
+  // is gone — and for an app's sign-in, landing on our home page instead of
+  // back in the app is a dead end. Same-origin paths only.
+  const redirect = safeRedirectPath(body?.redirect)
+  const link = `${publicOrigin(event)}/auth/verify?token=${token}${redirect && redirect.length <= 1024 ? `&redirect=${encodeURIComponent(redirect)}` : ''}`
 
   const message = magicLinkEmail({
     link,

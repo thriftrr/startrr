@@ -3,6 +3,8 @@ import { MAX_PASSKEYS } from '#shared/types/passkey'
 
 // Starts adding a passkey to the signed-in account.
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const session = await requireUser(event)
   const user = await getUserById(session.id)
   if (!user) throw createError({ statusCode: 401, statusMessage: 'Sign in required' })

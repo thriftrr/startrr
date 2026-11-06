@@ -8,6 +8,8 @@ const MAX_UA = 300
 // Finishes adding a passkey: checks the authenticator's answer to the
 // challenge from options.post.ts and stores the public key.
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const user = await requireUser(event)
   await assertRateLimit([{ key: `passkey-add:${user.id}`, limit: 10, windowSeconds: 3_600 }])
 

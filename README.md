@@ -4,7 +4,8 @@ A starting place for a simple web app. Nuxt 4 + [NuxtHub](https://hub.nuxt.com/)
 on a single Cloudflare Worker (D1, KV, R2), with the parts every small app
 needs already built and hardened:
 
-- **Passwordless accounts** — magic links (15-minute, single-use, only the
+- **Passwordless accounts** — standalone, or through
+[Authrr](#accounts-through-authrr) for one sign-in across apps. Magic links (15-minute, single-use, only the
   SHA-256 digest stored) to prove an email, then passkeys for one-tap sign-in
   after that; sessions as signed JWTs that name a revocable row, and a "sign
   out everywhere else" button that actually works.
@@ -64,8 +65,9 @@ makefile                 build · up · check · test · rename · secrets · de
 scripts/rename.sh        make rename NAME=…
 src/nuxt/
   app/                   pages, components, composables, layouts, middleware
+  server/routes/         auth/authrr (start, callback) — sign-in through Authrr
   server/api/            auth, account, scratch (example)
-  server/utils/          session, auth-db, passkeys, rate-limit, email, turnstile, origin
+  server/utils/          session, auth-db, passkeys, authrr, rate-limit, email, turnstile, origin
   server/middleware/     security headers + CSP nonce, origin check, body limit
   server/plugins/        csp-nonce (stamps the nonce onto rendered scripts)
   server/db/schema.ts    users, login_tokens, sessions, passkeys, feedback
@@ -105,6 +107,52 @@ Storage is NuxtHub: drizzle over SQLite/D1 ([server/db/schema.ts](src/nuxt/serve
 migrations via `npx nuxt db generate`), KV for rate-limit counters and the
 example note, R2 for profile pictures.
 
+## Accounts through Authrr
+
+[Authrr](https://github.com/thriftrr/authrr) is the thriftrr identity
+provider: one account and one passkey across every app built on this
+template. Point an app at it and that app's own magic links and passkeys
+switch off; `/login` goes straight on to Authrr and comes back signed in.
+
+1. In Authrr, **Apps → Register an app**, with
+   `<NUXT_APP_ORIGIN>/auth/authrr/callback` as the redirect URI. It shows
+   the client secret once.
+2. In this app's `src/nuxt/.env`:
+
+   ```sh
+   NUXT_PUBLIC_AUTHRR_ISSUER=https://authrr.thriftrr.biz
+   NUXT_AUTHRR_CLIENT_ID=startrr
+   NUXT_AUTHRR_CLIENT_SECRET=…
+   NUXT_CF_AUTHRR_SERVICE=authrr   # the Authrr worker's name (Cloudflare)
+   ```
+
+3. `make secrets && make deploy`.
+
+What changes:
+
+- **Who someone is** comes from Authrr's ID token. The local `users` row is
+  kept (everything the app stores still hangs off its id) and linked by
+  Authrr's `sub`; the first time, an existing account with the same email
+  is adopted, so switching an app over keeps everyone's data.
+- **Sessions stay local** — the same revocable 30-day cookie — but the
+  hourly refresh also asks Authrr whether the person is still allowed in
+  and copies their name, photo and role. A ban there ends the session here
+  within the hour. If Authrr can't be reached, the session stands and the
+  question is asked again on the next request.
+- **Admin** is `NUXT_ADMIN_EMAILS` *or* the `admin` role Authrr gives on
+  this app.
+- **The account page** shows the profile read-only with a link to edit it
+  in Authrr; the passkeys card goes (passkeys live there). Palettes and the
+  signed-in browsers list stay.
+- **Sign out** goes through Authrr's logout, so the next sign-in actually
+  asks — otherwise `/login` would send you straight back in.
+- **`NUXT_CF_AUTHRR_SERVICE`** adds a service binding, so calls to Authrr
+  (code exchange, keys, session checks) go worker-to-worker instead of over
+  the internet — Cloudflare doesn't always let a Worker fetch another
+  Worker's domain in the same zone.
+
+Leave `NUXT_PUBLIC_AUTHRR_ISSUER` empty and nothing here applies.
+
 ## Feedback module
 
 The floating Feedback button, its Markdown editor (TipTap), the admin inbox
@@ -139,25 +187,21 @@ One Worker with D1 (database), two KV namespaces (rate limits/notes + cache),
 and an R2 bucket (profile pictures). Everything is created in **your**
 Cloudflare account; the repo carries no account ids.
 
-1. `npx wrangler login` once, then create the resources:
-
-   ```sh
-   cd src/nuxt
-   npx wrangler d1 create startrr-db
-   npx wrangler kv namespace create startrr-kv
-   npx wrangler kv namespace create startrr-cache
-   npx wrangler r2 bucket create startrr-blob
-   ```
-
-2. Fill the "Cloudflare deployment" block of `src/nuxt/.env` with the ids
-   wrangler printed, plus `NUXT_CF_ACCOUNT_ID`, `NUXT_APP_ORIGIN`,
-   `NUXT_ADMIN_EMAILS`, a generated `NUXT_SESSION_SECRET`, and the
-   email-sending settings above.
+1. `npx wrangler login` once, then `make setup`. It creates the D1
+   database, both KV namespaces and the R2 bucket (startrr-db, startrr-kv,
+   startrr-cache, startrr-blob) in your account and writes their ids into
+   `src/nuxt/.env`, with your account id and a generated session secret.
+   Re-running it is safe: anything already there is left alone.
+2. Fill in what only you know — `make setup` lists it: `NUXT_APP_ORIGIN`,
+   `NUXT_ADMIN_EMAILS`, and the email-sending settings above (plus the `NUXT_AUTHRR_*` values, if signing in through Authrr).
 3. `make secrets` pushes the secret values (session secret, email token,
    Turnstile secret) to the worker. Run it again whenever one changes.
 4. `make deploy` builds with the Cloudflare preset, applies pending D1
    migrations, and deploys. Non-secret settings ride along as worker vars on
-   every deploy.
+   every deploy. The worker is served **only** at `NUXT_APP_ORIGIN`: that
+   hostname becomes its custom domain (the zone has to be on your
+   Cloudflare account), and the `*.workers.dev` address and version preview
+   URLs are switched off.
 
 To try the production build locally before deploying (real CSP, real
 bindings emulated by wrangler):

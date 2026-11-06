@@ -1,4 +1,6 @@
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const body = await readBody<{ token?: string }>(event)
   const token = body?.token
   if (typeof token !== 'string' || !token || token.length > 128) {

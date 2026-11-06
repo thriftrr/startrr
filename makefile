@@ -26,6 +26,11 @@ rename:
 # Cloudflare deployment (see "Deploying" in README.md)
 # ------------------------------------
 # One-time: create the D1/KV/R2 resources, fill src/nuxt/.env, then `make secrets`.
+# Create this app's D1/KV/R2 in your Cloudflare account and write their ids
+# (and a session secret) into src/nuxt/.env. Safe to re-run.
+setup:
+	cd src/nuxt && bash scripts/setup.sh
+
 secrets:
 	cd src/nuxt && bash scripts/secrets.sh
 
@@ -33,4 +38,4 @@ secrets:
 deploy:
 	cd src/nuxt && bash scripts/deploy.sh
 
-.PHONY: build up check test smoke rename secrets deploy
+.PHONY: build up check test smoke rename setup secrets deploy

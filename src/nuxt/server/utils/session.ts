@@ -85,7 +85,16 @@ async function readSession (event: H3Event): Promise<SessionUser | null> {
     return null
   }
   if (Date.now() - new Date(row.lastSeenAt).getTime() > LAST_SEEN_REFRESH_MS) {
-    await touchSession(sid).catch(() => { /* best effort */ })
+    // With Authrr, the hourly refresh is also when it's asked whether this
+    // person is still allowed in — a ban there ends the session here.
+    // Unreachable means ask again next request, so last_seen stays put.
+    const allowed = authrrEnabled() ? await authrrStillAllows(event, sub) : true
+    if (allowed === false) {
+      await deleteSession(sid).catch(() => { /* already gone */ })
+      deleteCookie(event, SESSION_COOKIE, { path: '/' })
+      return null
+    }
+    if (allowed === true) await touchSession(sid).catch(() => { /* best effort */ })
   }
   return { id: sub, email, sessionId: sid }
 }

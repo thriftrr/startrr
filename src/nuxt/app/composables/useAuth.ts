@@ -38,9 +38,12 @@ export function useAuth () {
     }
   }
 
+  // Signs out here and goes on to the sign-in page — through Authrr's
+  // logout when it runs accounts, so the next sign-in actually asks.
   async function logout () {
-    await $fetch('/api/auth/logout', { method: 'POST' })
+    const { next } = await $fetch<{ ok: boolean, next?: string }>('/api/auth/logout', { method: 'POST' })
     user.value = null
+    await navigateTo(next || '/login', { external: Boolean(next) })
   }
 
   return { user, loaded, displayName, refresh, logout }

@@ -4,6 +4,8 @@
 const MAX_BYTES = 1024 * 1024 // 1MB
 
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const session = await requireUser(event)
 
   const form = await readMultipartFormData(event)

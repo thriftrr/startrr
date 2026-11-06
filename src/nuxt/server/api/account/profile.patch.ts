@@ -22,6 +22,11 @@ export default defineEventHandler(async (event) => {
 
   const patch: ProfilePatch = {}
 
+  // Names belong to Authrr when it runs accounts; edit them there.
+  if (authrrEnabled() && (body?.firstName !== undefined || body?.lastName !== undefined)) {
+    throw createError({ statusCode: 400, statusMessage: 'Your name is managed by Authrr' })
+  }
+
   const first = cleanName(body?.firstName)
   if (first !== undefined) patch.firstName = first
   const last = cleanName(body?.lastName)

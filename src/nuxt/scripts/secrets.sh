@@ -14,7 +14,7 @@ if [ -z "$session" ]; then
   echo "✘ NUXT_SESSION_SECRET is empty in .env — generate one: openssl rand -base64 32"
   exit 1
 fi
-for key in NUXT_SESSION_SECRET NUXT_CF_EMAIL_TOKEN NUXT_TURNSTILE_SECRET_KEY; do
+for key in NUXT_SESSION_SECRET NUXT_AUTHRR_CLIENT_SECRET NUXT_CF_EMAIL_TOKEN NUXT_TURNSTILE_SECRET_KEY; do
   val="$(get "$key")"
   if [ -n "$val" ]; then
     printf '%s' "$val" | npx wrangler secret put "$key" --name "$WORKER_NAME"

@@ -1,6 +1,8 @@
 // Removes one of the signed-in account's passkeys. Never a lockout: the
 // email link still works with none left.
 export default defineEventHandler(async (event) => {
+  // Local accounts only: with Authrr configured, sign-in happens there.
+  assertLocalAccounts()
   const user = await requireUser(event)
   const id = getRouterParam(event, 'id')
   if (!id || id.length > 1364) {

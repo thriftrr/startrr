@@ -15,6 +15,14 @@ export const users = sqliteTable('users', {
   palette: text('palette'),
   // When the home "fill in your profile" card was skipped. Null = still shown.
   onboardingDismissedAt: text('onboarding_dismissed_at'),
+  // Signed in through Authrr (NUXT_AUTHRR_ISSUER): the Authrr account id,
+  // which never changes even when the email does. Null for local accounts.
+  authrrSub: text('authrr_sub').unique(),
+  // From Authrr's sign-in: 'admin' or 'member'. Null for local accounts,
+  // where NUXT_ADMIN_EMAILS alone decides.
+  role: text('role'),
+  // Authrr's photo URL (its `picture` claim). A local upload still wins.
+  pictureUrl: text('picture_url'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`)
 })
 

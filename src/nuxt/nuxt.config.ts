@@ -1,5 +1,20 @@
 import { APP_DESCRIPTION, APP_NAME, APP_SLUG } from './shared/app'
 
+// A deployed origin (https, a real hostname, nothing after it) becomes the
+// worker's custom domain. Anything else — unset, localhost, a typo with a
+// path — adds no route, and scripts/deploy.sh refuses to ship without one.
+function customDomainRoutes (origin: string | undefined) {
+  if (!origin) return {}
+  let url: URL
+  try {
+    url = new URL(origin)
+  } catch {
+    return {}
+  }
+  const clean = url.protocol === 'https:' && url.origin === origin.replace(/\/$/, '') && !['localhost', '127.0.0.1'].includes(url.hostname)
+  return clean ? { routes: [{ pattern: url.hostname, custom_domain: true }] } : {}
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   // Self-hosted Cloudflare deployment: production swaps the local sqlite/fs
@@ -66,7 +81,15 @@ export default defineNuxtConfig({
     // Cloudflare Turnstile secret (NUXT_TURNSTILE_SECRET_KEY). With the
     // public site key below, the sign-in form gets a bot check.
     turnstileSecretKey: '',
+    // Sign in through Authrr (see "Accounts through Authrr" in the README):
+    // the client id and secret from Authrr's Apps page. Only used when
+    // NUXT_PUBLIC_AUTHRR_ISSUER below is set.
+    authrrClientId: '',
+    authrrClientSecret: '',
     public: {
+      // NUXT_PUBLIC_AUTHRR_ISSUER — Authrr's origin. Set, and this app's own
+      // magic links and passkeys switch off in favour of Authrr's.
+      authrrIssuer: '',
       // NUXT_PUBLIC_TURNSTILE_SITE_KEY — empty disables the widget
       turnstileSiteKey: ''
     }
@@ -76,7 +99,25 @@ export default defineNuxtConfig({
 
   nitro: {
     // Worker name for the Cloudflare build (otherwise nitro invents one).
-    cloudflare: { wrangler: { name: process.env.NUXT_CF_WORKER_NAME || APP_SLUG } },
+    // NUXT_CF_AUTHRR_SERVICE names the Authrr worker for a service binding,
+    // so calls to it skip the public internet (and Cloudflare's same-zone
+    // fetch restrictions). See server/utils/authrr.ts.
+    cloudflare: {
+      wrangler: {
+        name: process.env.NUXT_CF_WORKER_NAME || APP_SLUG,
+        // Served only at NUXT_APP_ORIGIN. The *.workers.dev address (and
+        // per-version preview URLs) would be a second origin that the Origin
+        // check, the passkey domain and Authrr's redirect URI disagree with.
+        workers_dev: false,
+        preview_urls: false,
+        // The custom domain follows NUXT_APP_ORIGIN, so the deploy can't
+        // drift from the domain passkeys are bound to.
+        ...customDomainRoutes(process.env.NUXT_APP_ORIGIN),
+        ...(process.env.NUXT_CF_AUTHRR_SERVICE
+          ? { services: [{ binding: 'AUTHRR', service: process.env.NUXT_CF_AUTHRR_SERVICE }] }
+          : {})
+      }
+    },
     // Nitro tree-shakes every package import it isn't told has side effects.
     // @simplewebauthn/server imports reflect-metadata purely for its Reflect
     // polyfill, which tsyringe (via @peculiar/x509) checks for at load time —
