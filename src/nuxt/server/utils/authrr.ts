@@ -126,7 +126,7 @@ export function authrrCallbackUri (event: H3Event): string {
 // `popup`: the sign-in runs in a small window over the page (the default
 // from /login), and the callback hands off to /auth/popup-done instead of
 // navigating; see app/utils/authrr-popup.ts.
-export async function startAuthrrLogin (event: H3Event, redirect: string, popup = false): Promise<string> {
+export async function startAuthrrLogin (event: H3Event, redirect: string, popup = false, look: { theme?: string, scheme?: string } = {}): Promise<string> {
   const { issuer, clientId } = authrrConfig()
   const state = randomBytes(16).toString('base64url')
   const verifier = randomBytes(32).toString('base64url')
@@ -154,7 +154,9 @@ export async function startAuthrrLogin (event: H3Event, redirect: string, popup 
     state,
     nonce,
     code_challenge: createHash('sha256').update(verifier).digest('base64url'),
-    code_challenge_method: 'S256'
+    code_challenge_method: 'S256',
+    // Authrr shows its pages in this app's palette and scheme.
+    ...look
   })
   return `${issuer}/oauth/authorize?${params}`
 }
