@@ -78,6 +78,8 @@ async function authrrKeys (event: H3Event, kid: string | undefined) {
 // A failure the person should see on the sign-in page; the words for each
 // code are in shared/utils/authrr-errors.ts.
 export class AuthrrLoginError extends Error {
+  // Set once the state cookie is read: whether this sign-in ran in a popup.
+  popup = false
   constructor (readonly code: AuthrrErrorCode) {
     super(AUTHRR_ERRORS[code])
   }
@@ -96,13 +98,16 @@ export function authrrCallbackUri (event: H3Event): string {
 // in a short-lived signed cookie rather than a table, so starting a sign-in
 // writes nothing; the cookie is SameSite=Lax, which is sent on the
 // top-level redirect back from Authrr.
-export async function startAuthrrLogin (event: H3Event, redirect: string): Promise<string> {
+// `popup`: the sign-in runs in a small window over the page (the default
+// from /login), and the callback hands off to /auth/popup-done instead of
+// navigating; see app/utils/authrr-popup.ts.
+export async function startAuthrrLogin (event: H3Event, redirect: string, popup = false): Promise<string> {
   const { issuer, clientId } = authrrConfig()
   const state = randomBytes(16).toString('base64url')
   const verifier = randomBytes(32).toString('base64url')
   const nonce = randomBytes(16).toString('base64url')
 
-  const token = await new SignJWT({ state, verifier, nonce, redirect })
+  const token = await new SignJWT({ state, verifier, nonce, redirect, popup })
     .setProtectedHeader({ alg: 'HS256' })
     .setAudience(STATE_AUDIENCE)
     .setIssuedAt()
@@ -156,65 +161,73 @@ function readClaims (value: Record<string, unknown>): AuthrrClaims | null {
 // The callback: checks the state against the cookie, swaps the code for an
 // ID token, and verifies it. Returns who signed in and where they were
 // headed.
-export async function finishAuthrrLogin (event: H3Event): Promise<{ claims: AuthrrClaims, redirect: string }> {
+export async function finishAuthrrLogin (event: H3Event): Promise<{ claims: AuthrrClaims, redirect: string, popup: boolean }> {
   const { issuer, clientId } = authrrConfig()
   const query = getQuery(event)
 
   const raw = getCookie(event, STATE_COOKIE)
   deleteCookie(event, STATE_COOKIE, { path: COOKIE_PATH })
-  let saved: { state?: unknown, verifier?: unknown, nonce?: unknown, redirect?: unknown }
+  let saved: { state?: unknown, verifier?: unknown, nonce?: unknown, redirect?: unknown, popup?: unknown }
   try {
     if (!raw) throw new Error('no cookie')
     ;({ payload: saved } = await jwtVerify(raw, sessionSecret(), { audience: STATE_AUDIENCE }))
   } catch {
     throw new AuthrrLoginError('expired')
   }
-  if (typeof saved.state !== 'string' || query.state !== saved.state) {
-    throw new AuthrrLoginError('mismatch')
-  }
-  // RFC 9207: the response says who sent it, and it has to be our issuer.
-  if (query.iss !== undefined && query.iss !== issuer) {
-    throw new AuthrrLoginError('wrong-issuer')
-  }
-  if (typeof query.error === 'string') {
-    if (query.error === 'access_denied') throw new AuthrrLoginError('denied')
-    throw new AuthrrLoginError('failed')
-  }
-  const code = query.code
-  if (typeof code !== 'string' || !code || code.length > 128) throw new AuthrrLoginError('failed')
-
-  const res = await authrrFetch(event, '/oauth/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded', 'authorization': basicAuth() },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: authrrCallbackUri(event),
-      code_verifier: String(saved.verifier)
-    }).toString()
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { error?: string }
-    if (body.error === 'access_denied') throw new AuthrrLoginError('denied')
-    if (body.error === 'invalid_client') throw new AuthrrLoginError('bad-client')
-    throw new AuthrrLoginError('failed')
-  }
-  const { id_token: idToken } = await res.json() as { id_token?: string }
-  if (!idToken) throw new AuthrrLoginError('bad-token')
-
-  let payload: Record<string, unknown>
+  // From here on the cookie is ours, so a failure knows whether it was a
+  // popup's and can be handed back to the page that opened it.
+  const popup = saved.popup === true
   try {
-    const kid = JSON.parse(Buffer.from(idToken.split('.')[0] ?? '', 'base64url').toString('utf8')).kid as string | undefined
-    ;({ payload } = await jwtVerify(idToken, await authrrKeys(event, kid), { issuer, audience: clientId, algorithms: ['ES256'] }))
-  } catch (cause) {
-    if (cause instanceof AuthrrLoginError) throw cause
-    throw new AuthrrLoginError('bad-token')
-  }
-  if (payload.nonce !== saved.nonce) throw new AuthrrLoginError('bad-token')
+    if (typeof saved.state !== 'string' || query.state !== saved.state) {
+      throw new AuthrrLoginError('mismatch')
+    }
+    // RFC 9207: the response says who sent it, and it has to be our issuer.
+    if (query.iss !== undefined && query.iss !== issuer) {
+      throw new AuthrrLoginError('wrong-issuer')
+    }
+    if (typeof query.error === 'string') {
+      if (query.error === 'access_denied') throw new AuthrrLoginError('denied')
+      throw new AuthrrLoginError('failed')
+    }
+    const code = query.code
+    if (typeof code !== 'string' || !code || code.length > 128) throw new AuthrrLoginError('failed')
 
-  const claims = readClaims(payload)
-  if (!claims) throw new AuthrrLoginError('bad-token')
-  return { claims, redirect: safeRedirectPath(saved.redirect) }
+    const res = await authrrFetch(event, '/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'authorization': basicAuth() },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: authrrCallbackUri(event),
+        code_verifier: String(saved.verifier)
+      }).toString()
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string }
+      if (body.error === 'access_denied') throw new AuthrrLoginError('denied')
+      if (body.error === 'invalid_client') throw new AuthrrLoginError('bad-client')
+      throw new AuthrrLoginError('failed')
+    }
+    const { id_token: idToken } = await res.json() as { id_token?: string }
+    if (!idToken) throw new AuthrrLoginError('bad-token')
+
+    let payload: Record<string, unknown>
+    try {
+      const kid = JSON.parse(Buffer.from(idToken.split('.')[0] ?? '', 'base64url').toString('utf8')).kid as string | undefined
+      ;({ payload } = await jwtVerify(idToken, await authrrKeys(event, kid), { issuer, audience: clientId, algorithms: ['ES256'] }))
+    } catch (cause) {
+      if (cause instanceof AuthrrLoginError) throw cause
+      throw new AuthrrLoginError('bad-token')
+    }
+    if (payload.nonce !== saved.nonce) throw new AuthrrLoginError('bad-token')
+
+    const claims = readClaims(payload)
+    if (!claims) throw new AuthrrLoginError('bad-token')
+    return { claims, redirect: safeRedirectPath(saved.redirect), popup }
+  } catch (cause) {
+    if (cause instanceof AuthrrLoginError) cause.popup = popup
+    throw cause
+  }
 }
 
 // ---- Local accounts --------------------------------------------------------

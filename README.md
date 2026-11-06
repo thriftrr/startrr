@@ -112,7 +112,12 @@ example note, R2 for profile pictures.
 [Authrr](https://github.com/thriftrr/authrr) is the thriftrr identity
 provider: one account and one passkey across every app built on this
 template. Point an app at it and that app's own magic links and passkeys
-switch off; `/login` goes straight on to Authrr and comes back signed in.
+switch off. People stay on the app throughout: `/login` shows a "Sign in
+with thriftrr" button that opens Authrr in a small window, and the page
+carries on signed in once it closes (if they were already signed in to
+Authrr, it just flashes). An emailed link opened in another tab finishes
+the sign-in in the window that's waiting. Popups blocked, it's a plain
+redirect instead.
 
 1. In Authrr, **Apps → Register an app**, with
    `<NUXT_APP_ORIGIN>/auth/authrr/callback` as the redirect URI. It shows
