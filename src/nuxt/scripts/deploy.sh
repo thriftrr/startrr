@@ -30,6 +30,21 @@ fi
 export CLOUDFLARE_ACCOUNT_ID="$NUXT_CF_ACCOUNT_ID"
 WORKER_NAME="${NUXT_CF_WORKER_NAME:-startrr}"
 
+# NUXT_APP_ORIGIN is the passkey domain and the custom domain at once (nuxt.config.ts builds the route from it), so it has to be a
+# bare https origin.
+case "$NUXT_APP_ORIGIN" in
+  https://*) ;;
+  *) echo "✘ NUXT_APP_ORIGIN must start with https:// (got: $NUXT_APP_ORIGIN)"; exit 1 ;;
+esac
+DOMAIN="${NUXT_APP_ORIGIN#https://}"
+DOMAIN="${DOMAIN%/}"
+case "$DOMAIN" in
+  ''|*/*|*:*|*.workers.dev)
+    echo "✘ NUXT_APP_ORIGIN must be https://<your domain> with no path or port, and not a workers.dev address (got: $NUXT_APP_ORIGIN)"
+    exit 1 ;;
+esac
+echo "── deploying to https://$DOMAIN"
+
 # Production needs a session secret; refuse to ship a worker that would 500.
 if ! npx wrangler secret list --name "$WORKER_NAME" 2>/dev/null | grep -q '"NUXT_SESSION_SECRET"'; then
   echo "✘ The worker has no NUXT_SESSION_SECRET secret yet. Run: make secrets"
@@ -46,6 +61,15 @@ p = pathlib.Path('.output/server/wrangler.json')
 cfg = json.loads(p.read_text())
 cfg['d1_databases'][0]['database_name'] = sys.argv[1]
 p.write_text(json.dumps(cfg, indent=2))
+PY
+
+# Belt and braces: the built config has to serve only the custom domain.
+python3 - "$DOMAIN" <<'PY'
+import json, pathlib, sys
+cfg = json.loads(pathlib.Path('.output/server/wrangler.json').read_text())
+routes = [r.get('pattern') for r in cfg.get('routes', []) if r.get('custom_domain')]
+if cfg.get('workers_dev') is not False or routes != [sys.argv[1]]:
+    sys.exit(f"✘ built config isn't custom-domain-only (workers_dev={cfg.get('workers_dev')}, routes={routes}) — NOT deploying")
 PY
 
 echo "── apply pending D1 migrations"

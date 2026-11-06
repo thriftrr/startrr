@@ -1,5 +1,20 @@
 import { APP_DESCRIPTION, APP_NAME, APP_SLUG } from './shared/app'
 
+// A deployed origin (https, a real hostname, nothing after it) becomes the
+// worker's custom domain. Anything else — unset, localhost, a typo with a
+// path — adds no route, and scripts/deploy.sh refuses to ship without one.
+function customDomainRoutes (origin: string | undefined) {
+  if (!origin) return {}
+  let url: URL
+  try {
+    url = new URL(origin)
+  } catch {
+    return {}
+  }
+  const clean = url.protocol === 'https:' && url.origin === origin.replace(/\/$/, '') && !['localhost', '127.0.0.1'].includes(url.hostname)
+  return clean ? { routes: [{ pattern: url.hostname, custom_domain: true }] } : {}
+}
+
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   // Self-hosted Cloudflare deployment: production swaps the local sqlite/fs
@@ -90,6 +105,14 @@ export default defineNuxtConfig({
     cloudflare: {
       wrangler: {
         name: process.env.NUXT_CF_WORKER_NAME || APP_SLUG,
+        // Served only at NUXT_APP_ORIGIN. The *.workers.dev address (and
+        // per-version preview URLs) would be a second origin that the Origin
+        // check, the passkey domain and Authrr's redirect URI disagree with.
+        workers_dev: false,
+        preview_urls: false,
+        // The custom domain follows NUXT_APP_ORIGIN, so the deploy can't
+        // drift from the domain passkeys are bound to.
+        ...customDomainRoutes(process.env.NUXT_APP_ORIGIN),
         ...(process.env.NUXT_CF_AUTHRR_SERVICE
           ? { services: [{ binding: 'AUTHRR', service: process.env.NUXT_CF_AUTHRR_SERVICE }] }
           : {})

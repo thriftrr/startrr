@@ -205,7 +205,10 @@ Cloudflare account; the repo carries no account ids.
    Turnstile secret) to the worker. Run it again whenever one changes.
 4. `make deploy` builds with the Cloudflare preset, applies pending D1
    migrations, and deploys. Non-secret settings ride along as worker vars on
-   every deploy.
+   every deploy. The worker is served **only** at `NUXT_APP_ORIGIN`: that
+   hostname becomes its custom domain (the zone has to be on your
+   Cloudflare account), and the `*.workers.dev` address and version preview
+   URLs are switched off.
 
 To try the production build locally before deploying (real CSP, real
 bindings emulated by wrangler):

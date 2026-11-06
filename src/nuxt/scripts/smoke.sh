@@ -37,9 +37,14 @@ echo "── migrations into a throwaway local D1"
 npx wrangler --cwd .output/server d1 migrations apply DB --local --persist-to "$STATE" >"$STATE/migrate.log" 2>&1 \
   || { tail -40 "$STATE/migrate.log"; fail "migrations"; }
 
+# --local-upstream keeps requests addressed to localhost: with a custom
+# domain in the config (any .env with NUXT_APP_ORIGIN set), wrangler dev
+# would otherwise rewrite them to that domain and the Origin check would
+# rightly refuse every POST.
 echo "── wrangler dev on :$PORT"
 setsid npx wrangler --cwd .output dev --port "$PORT" --persist-to "$STATE" \
-  --var "NUXT_SESSION_SECRET:smoke-test-only" --var "NUXT_APP_ORIGIN:$ORIGIN" >"$LOG" 2>&1 &
+  --var "NUXT_SESSION_SECRET:smoke-test-only" --var "NUXT_APP_ORIGIN:$ORIGIN" \
+  --local-upstream "localhost:$PORT" >"$LOG" 2>&1 &
 WRANGLER=$!
 
 # curl retries refused connections while workerd starts, and 5xx answers
