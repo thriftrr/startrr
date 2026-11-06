@@ -60,10 +60,11 @@ export async function getUserByAuthrrSub (sub: string): Promise<DbUser | null> {
 export interface AuthrrProfilePatch {
   authrrSub?: string
   email?: string
-  firstName: string | null
-  lastName: string | null
-  pictureUrl: string | null
-  role: string
+  firstName?: string | null
+  lastName?: string | null
+  pictureUrl?: string | null
+  palette?: string | null
+  role?: string
 }
 
 export async function applyAuthrrProfile (id: string, patch: AuthrrProfilePatch): Promise<void> {

@@ -1,14 +1,67 @@
 <script setup lang="ts">
+import { APP_NAME } from '#shared/app'
 import { PALETTES, DEFAULT_PALETTE } from '#shared/types/palette'
 import { MAX_PASSKEYS } from '#shared/types/passkey'
 import type { PasskeyList, PasskeySummary } from '#shared/types/passkey'
+import type { SettingScope, SettingsMap } from '#shared/types/settings'
 
 useHead({ title: 'Account' })
 
-const { user, loaded, refresh, logout, displayName } = useAuth()
-// With Authrr running accounts, name, photo and passkeys live there.
+const { user, loaded, refresh, logout } = useAuth()
+// With Authrr running accounts, settings live there (each for every app or
+// just this one, server/utils/settings.ts) and passkeys are Authrr's alone.
 const { public: { authrrIssuer } } = useRuntimeConfig()
 const authrrAccount = authrrIssuer ? `${String(authrrIssuer).replace(/\/$/, '')}/account` : ''
+
+// ---- Where each setting applies ----------------------------------------------
+// Defaults to every app; a setting that already has its own value here
+// starts on "just this app", so saving doesn't quietly widen it.
+const settings = ref<SettingsMap>({})
+// Name and photo each have their own: a photo just for this app mustn't
+// make the next name change just for this app too.
+const nameScope = ref<SettingScope>('global')
+const photoScope = ref<SettingScope>('global')
+const paletteScope = ref<SettingScope>('global')
+const notifyScope = ref<SettingScope>('global')
+const notifications = ref(true)
+const notifyBusy = ref(false)
+const notifyError = ref('')
+// Saving waits for these, so a quick click can't save with the default
+// scope before the real one is known.
+const settingsLoaded = ref(!authrrIssuer)
+
+async function loadSettings () {
+  try {
+    settings.value = (await $fetch<{ settings: SettingsMap }>('/api/account/settings')).settings
+  } catch { /* the cards still work; scope just starts at "everywhere" */ }
+  const local = (key: string) => settings.value[key]?.from === 'app'
+  if (authrrIssuer) {
+    nameScope.value = local('name.first') || local('name.last') ? 'app' : 'global'
+    photoScope.value = local('photo') ? 'app' : 'global'
+    paletteScope.value = local('palette') ? 'app' : 'global'
+    notifyScope.value = local('email.notifications') ? 'app' : 'global'
+  }
+  notifications.value = settings.value['email.notifications']?.value !== false
+  settingsLoaded.value = true
+}
+
+// Through Authrr, a photo of this app's own can go back to the shared one.
+const photoIsLocal = computed(() => settings.value.photo?.from === 'app')
+
+async function setNotifications (enabled: boolean) {
+  notifyBusy.value = true
+  notifyError.value = ''
+  try {
+    await $fetch('/api/account/settings', { method: 'PATCH', body: { key: 'email.notifications', value: enabled, scope: notifyScope.value } })
+    notifications.value = enabled
+    await loadSettings()
+  } catch (cause: unknown) {
+    const err = cause as { data?: { statusMessage?: string } }
+    notifyError.value = err.data?.statusMessage ?? 'Could not save that.'
+  } finally {
+    notifyBusy.value = false
+  }
+}
 
 // ---- Profile ---------------------------------------------------------------
 const firstName = ref('')
@@ -35,7 +88,7 @@ onMounted(async () => {
   if (!user.value) return
   syncFromUser()
   passkeySupport.value = passkeysSupported() ? 'yes' : 'no'
-  await Promise.all([loadSessions(), authrrIssuer ? null : loadPasskeys()])
+  await Promise.all([loadSessions(), loadSettings(), authrrIssuer ? null : loadPasskeys()])
 })
 
 async function saveProfile () {
@@ -45,9 +98,9 @@ async function saveProfile () {
   try {
     await $fetch('/api/account/profile', {
       method: 'PATCH',
-      body: { firstName: firstName.value, lastName: lastName.value }
+      body: { firstName: firstName.value, lastName: lastName.value, scope: nameScope.value }
     })
-    await refresh()
+    await Promise.all([refresh(), loadSettings()])
     syncFromUser()
     profileSaved.value = true
     setTimeout(() => {
@@ -82,8 +135,9 @@ async function onAvatarPicked () {
   try {
     const body = new FormData()
     body.append('file', file)
+    body.append('scope', photoScope.value)
     await $fetch('/api/account/avatar', { method: 'POST', body })
-    await refresh()
+    await Promise.all([refresh(), loadSettings()])
   } catch (cause: unknown) {
     const err = cause as { data?: { statusMessage?: string } }
     avatarError.value = err.data?.statusMessage ?? 'Could not upload that image.'
@@ -98,8 +152,10 @@ async function resetAvatar () {
   avatarBusy.value = true
   avatarError.value = ''
   try {
-    await $fetch('/api/account/avatar', { method: 'DELETE' })
-    await refresh()
+    // Just this app's own photo goes; the shared one comes back.
+    const scope = photoIsLocal.value ? 'app' : 'global'
+    await $fetch(`/api/account/avatar?scope=${scope}`, { method: 'DELETE' })
+    await Promise.all([refresh(), loadSettings()])
   } finally {
     avatarBusy.value = false
   }
@@ -116,7 +172,8 @@ async function choosePalette (id: string) {
   paletteBusy.value = true
   paletteError.value = ''
   try {
-    await savePalette(id)
+    await savePalette(id, authrrIssuer ? paletteScope.value : undefined)
+    if (authrrIssuer) await loadSettings()
     paletteSavedAs.value = id
     setTimeout(() => {
       if (paletteSavedAs.value === id) paletteSavedAs.value = ''
@@ -287,50 +344,6 @@ async function signOut () {
 
     <template v-else-if="user">
       <section
-        v-if="authrrIssuer"
-        id="profile"
-        class="y-card"
-      >
-        <div class="y-card-title">
-          Profile
-        </div>
-        <div class="profile-body">
-          <div class="avatar-col">
-            <img
-              v-if="avatarUrl"
-              :src="avatarUrl"
-              alt="Profile picture"
-              width="84"
-              height="84"
-              class="avatar"
-            >
-            <span
-              v-else
-              class="avatar initials"
-            >{{ initials }}</span>
-          </div>
-          <div class="profile-fields">
-            <div class="managed-name">
-              {{ [user.firstName, user.lastName].filter(Boolean).join(' ') || displayName }}
-            </div>
-            <div class="y-small">
-              {{ user.email }}
-            </div>
-            <p class="hint">
-              Your name, photo, email and passkeys belong to your thriftrr
-              account, so every thriftrr app shows the same ones. Changes there
-              show up here within the hour.
-            </p>
-            <a
-              :href="authrrAccount"
-              class="y-btn-outline managed-link"
-            >Edit in Authrr →</a>
-          </div>
-        </div>
-      </section>
-
-      <section
-        v-else
         id="profile"
         class="y-card"
       >
@@ -358,7 +371,18 @@ async function signOut () {
           </div>
 
           <div class="profile-fields">
-            <p class="hint">
+            <p
+              v-if="authrrIssuer"
+              class="hint"
+            >
+              Your thriftrr account's name and photo, shared by every thriftrr app —
+              or give {{ APP_NAME }} its own. Passkeys and your sign-in email are in
+              <a :href="authrrAccount">your thriftrr account</a>.
+            </p>
+            <p
+              v-else
+              class="hint"
+            >
               Pulled automatically from <b>Gravatar</b> for {{ user.email }}. Upload your own
               to override it — or change it for every app at
               <a
@@ -406,7 +430,7 @@ async function signOut () {
               >
               <button
                 class="y-btn-dashed"
-                :disabled="avatarBusy"
+                :disabled="avatarBusy || !settingsLoaded"
                 @click="pickAvatar"
               >
                 {{ avatarBusy ? 'Uploading…' : hasCustomAvatar ? 'Replace photo…' : 'Upload a photo…' }}
@@ -417,11 +441,11 @@ async function signOut () {
                 :disabled="avatarBusy"
                 @click="resetAvatar"
               >
-                Use Gravatar again
+                {{ authrrIssuer && photoIsLocal ? 'Use my shared photo' : 'Use Gravatar again' }}
               </button>
               <button
                 class="y-btn save"
-                :disabled="profileBusy"
+                :disabled="profileBusy || !settingsLoaded"
                 @click="saveProfile"
               >
                 {{ profileSaved ? 'Saved ✓' : profileBusy ? 'Saving…' : 'Save profile' }}
@@ -430,6 +454,16 @@ async function signOut () {
             <p class="y-tiny fine">
               PNG, JPEG, WebP, or GIF — up to 1MB.
             </p>
+            <template v-if="authrrIssuer">
+              <SettingScope
+                v-model="nameScope"
+                label="Name for"
+              />
+              <SettingScope
+                v-model="photoScope"
+                label="New photo for"
+              />
+            </template>
             <p
               v-if="avatarError"
               class="y-error msg"
@@ -464,6 +498,11 @@ async function signOut () {
         <p class="y-body">
           The whole app re-tints — sidebar, buttons, links, badges. Pick the one that feels like yours.
         </p>
+        <SettingScope
+          v-if="authrrIssuer"
+          v-model="paletteScope"
+          label="Palette for"
+        />
         <div
           class="palettes"
           role="radiogroup"
@@ -477,7 +516,7 @@ async function signOut () {
             :class="{ on: palette === p.id }"
             role="radio"
             :aria-checked="palette === p.id"
-            :disabled="paletteBusy"
+            :disabled="paletteBusy || !settingsLoaded"
             @click="choosePalette(p.id)"
           >
             <span
@@ -506,6 +545,39 @@ async function signOut () {
           role="alert"
         >
           {{ paletteError }}
+        </p>
+      </section>
+
+      <section
+        id="notifications"
+        class="y-card"
+      >
+        <div class="y-card-title">
+          Notification emails
+        </div>
+        <label class="notify">
+          <input
+            type="checkbox"
+            :checked="notifications"
+            :disabled="notifyBusy || !settingsLoaded"
+            @change="setNotifications(($event.target as HTMLInputElement).checked)"
+          >
+          <span>
+            Email me about activity in {{ APP_NAME }}
+            <span class="y-small">Sign-in links always come.</span>
+          </span>
+        </label>
+        <SettingScope
+          v-if="authrrIssuer"
+          v-model="notifyScope"
+          label="This applies to"
+        />
+        <p
+          v-if="notifyError"
+          class="y-error msg"
+          role="alert"
+        >
+          {{ notifyError }}
         </p>
       </section>
 
@@ -683,8 +755,9 @@ async function signOut () {
 </template>
 
 <style scoped>
-.managed-name { font-size: 17px; font-weight: 800; }
-.managed-link { margin-top: 12px; display: inline-flex; text-decoration: none; }
+.notify { margin-top: 10px; display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: 14px; font-weight: 700; }
+.notify input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--teal); }
+.notify > span { display: flex; flex-direction: column; gap: 2px; }
 .page {
   flex: 1;
   min-width: 0;

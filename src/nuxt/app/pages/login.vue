@@ -18,15 +18,42 @@ const turnstile = ref<{ reset: () => void } | null>(null)
 const redirect = computed(() => safeRedirectPath(route.query.redirect))
 
 // ---- Accounts through Authrr --------------------------------------------------
-// With NUXT_PUBLIC_AUTHRR_ISSUER set there's nothing to fill in here: go
-// straight on to Authrr. Stay only to show why the last attempt failed, or
-// after signing out (going straight back would sign them in again).
+// With NUXT_PUBLIC_AUTHRR_ISSUER set, signing in happens in a small Authrr
+// window over this page (utils/authrr-popup.ts), and this page carries on
+// once it closes. A browser that won't open the window gets the plain
+// redirect: the same link, followed in this tab.
 const authrrStart = computed(() => `/auth/authrr/start${redirect.value ? `?${new URLSearchParams({ redirect: redirect.value })}` : ''}`)
-const authrrError = computed(() => route.query.error ? authrrErrorMessage(route.query.error) : '')
+const authrrError = ref(route.query.error ? authrrErrorMessage(route.query.error) : '')
 const signedOut = computed(() => route.query.signedOut !== undefined)
-if (authrrIssuer && !authrrError.value && !signedOut.value) {
-  await navigateTo(authrrStart.value, { external: true, replace: true })
+const authrrWaiting = ref(false)
+let stopAuthrr = () => {}
+
+async function signInWithAuthrr () {
+  authrrError.value = ''
+  stopAuthrr()
+  const popupUrl = `${authrrStart.value}${authrrStart.value.includes('?') ? '&' : '?'}popup=1`
+  const { opened, stop } = openAuthrrPopup(popupUrl, async (message) => {
+    authrrWaiting.value = false
+    if (message.type === 'error') {
+      authrrError.value = authrrErrorMessage(message.code)
+      return
+    }
+    await refresh()
+    await navigateTo(safeRedirectPath(message.next) || redirect.value || '/', { replace: true })
+  })
+  stopAuthrr = stop
+  if (!opened) {
+    window.location.assign(authrrStart.value)
+    return
+  }
+  authrrWaiting.value = true
 }
+
+function cancelAuthrr () {
+  stopAuthrr()
+  authrrWaiting.value = false
+}
+onBeforeUnmount(() => stopAuthrr())
 const canSend = computed(() => !sending.value && email.value.trim().length > 0 && (!turnstileSiteKey || turnstileToken.value))
 
 const { refresh } = useAuth()
@@ -127,10 +154,35 @@ async function reset () {
         {{ APP_NAME }} uses your thriftrr account — the same email link or
         passkey as every other thriftrr app.
       </p>
+      <!-- A link underneath, so it still works without JavaScript; the
+           click handler upgrades it to the popup. -->
       <a
         :href="authrrStart"
         class="y-btn send authrr-go"
-      >Continue with Authrr</a>
+        :aria-disabled="authrrWaiting"
+        @click.prevent="signInWithAuthrr"
+      >{{ authrrWaiting ? 'Waiting for the sign-in window…' : 'Sign in with thriftrr' }}</a>
+      <p
+        v-if="authrrWaiting"
+        class="y-small waiting"
+      >
+        Finish in the window that opened.
+        <button
+          class="y-btn-link"
+          type="button"
+          @click="signInWithAuthrr"
+        >
+          Open it again
+        </button>
+        ·
+        <button
+          class="y-btn-link"
+          type="button"
+          @click="cancelAuthrr"
+        >
+          Cancel
+        </button>
+      </p>
       <p
         v-if="authrrError"
         class="y-error err"
@@ -255,6 +307,7 @@ h1 { font-size: 18px; }
 form { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .send { padding: 11px 13px; font-size: 14px; }
 .authrr-go { margin-top: 18px; display: block; text-align: center; text-decoration: none; }
+.waiting { margin: 10px 0 0; text-align: center; }
 .or {
   margin: 16px 0;
   display: flex;

@@ -33,10 +33,11 @@ export function usePalette () {
     if (import.meta.client) remember(id)
   }
 
-  async function save (id: string) {
+  // `scope`: with accounts in Authrr, every app or just this one.
+  async function save (id: string, scope?: 'global' | 'app') {
     set(id)
     if (!user.value) return
-    await $fetch('/api/account/profile', { method: 'PATCH', body: { palette: id } })
+    await $fetch('/api/account/profile', { method: 'PATCH', body: { palette: id, scope } })
     user.value = { ...user.value, palette: id }
   }
 

@@ -1,12 +1,14 @@
 // Profile picture upload. Stored via NuxtHub Blob — Cloudflare R2 on a
 // deployed app, the local fs driver in dev — under avatars/<userId>, and
-// served back through avatar.get.ts.
+// served back through avatar.get.ts. Signed in through Authrr, the photo
+// goes to Authrr instead: the form's `scope` field says whether for every
+// app (the default) or just this one.
 const MAX_BYTES = 1024 * 1024 // 1MB
 
 export default defineEventHandler(async (event) => {
-  // Local accounts only: with Authrr configured, sign-in happens there.
-  assertLocalAccounts()
   const session = await requireUser(event)
+  // Each call may go on to Authrr, whose budget this app shares.
+  await assertRateLimit([{ key: `settings:${session.id}`, limit: 120, windowSeconds: 600 }])
 
   const form = await readMultipartFormData(event)
   const file = form?.find(part => part.name === 'file' && part.filename)
@@ -35,6 +37,14 @@ export default defineEventHandler(async (event) => {
     ensureBlob(upload, { maxSize: '1MB', types: ['image'] })
   } catch {
     throw createError({ statusCode: 415, statusMessage: 'Use a PNG, JPEG, WebP, or GIF image' })
+  }
+
+  if (authrrEnabled()) {
+    const scopePart = form?.find(part => part.name === 'scope')?.data.toString()
+    const scope = scopePart === 'app' ? 'app' : 'global'
+    await setAuthrrPhoto(event, session.id, { data: new Uint8Array(file.data), type }, scope)
+    const user = await getUserById(session.id)
+    return { ok: true, avatarUrl: user?.pictureUrl ?? null }
   }
 
   // One object per user, overwritten on replace — no orphans to sweep up.

@@ -1,6 +1,6 @@
 // Signed-out visitors land on the sign-in page. Only the sign-in pages
 // themselves are public; add marketing pages and the like to PUBLIC_ROUTES.
-const PUBLIC_ROUTES = ['/login', '/auth/verify']
+const PUBLIC_ROUTES = ['/login', '/auth/verify', '/auth/popup-done']
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (PUBLIC_ROUTES.some(path => to.path === path || to.path.startsWith(`${path}/`))) return
