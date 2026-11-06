@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { SignJWT, createLocalJWKSet, jwtVerify } from 'jose'
 import type { JSONWebKeySet } from 'jose'
 import { APP_SLUG } from '#shared/app'
+import { isPaletteId } from '#shared/types/palette'
 
 // Sign-in through Authrr, the thriftrr identity provider (OpenID Connect).
 //
@@ -50,6 +51,30 @@ async function authrrFetch (event: H3Event | undefined, path: string, init?: Req
   const binding = (event?.context as { cloudflare?: { env?: { AUTHRR?: { fetch: typeof fetch } } } } | undefined)?.cloudflare?.env?.AUTHRR
   if (binding) return await binding.fetch(url, init)
   return await fetch(url, init)
+}
+
+// A client-authenticated call to Authrr's API (its settings routes), as
+// JSON. Authrr's refusal comes through with its own words.
+export async function authrrApi<T> (event: H3Event, path: string, init: { method?: string, body?: BodyInit, json?: unknown, contentType?: string } = {}): Promise<T> {
+  const headers: Record<string, string> = { authorization: basicAuth() }
+  let body = init.body
+  if (init.json !== undefined) {
+    headers['content-type'] = 'application/json'
+    body = JSON.stringify(init.json)
+  } else if (init.contentType) {
+    headers['content-type'] = init.contentType
+  }
+  let res: Response
+  try {
+    res = await authrrFetch(event, path, { method: init.method ?? 'POST', headers, body })
+  } catch {
+    throw createError({ statusCode: 503, statusMessage: 'Could not reach Authrr. Try again in a moment.' })
+  }
+  const data = await res.json().catch(() => null) as (T & { statusMessage?: string }) | null
+  if (!res.ok || !data) {
+    throw createError({ statusCode: res.status >= 500 || !data ? 502 : res.status, statusMessage: data?.statusMessage ?? 'Authrr refused that' })
+  }
+  return data
 }
 
 function basicAuth (): string {
@@ -140,6 +165,7 @@ export interface AuthrrClaims {
   given_name?: string
   family_name?: string
   picture?: string
+  palette?: string
   role: 'admin' | 'member'
 }
 
@@ -154,6 +180,7 @@ function readClaims (value: Record<string, unknown>): AuthrrClaims | null {
     given_name: text(value.given_name),
     family_name: text(value.family_name),
     picture,
+    palette: typeof value.palette === 'string' ? value.palette : undefined,
     role: value.role === 'admin' ? 'admin' : 'member'
   }
 }
@@ -241,6 +268,8 @@ export async function syncAuthrrUser (claims: AuthrrClaims): Promise<DbUser> {
     firstName: claims.given_name ?? null,
     lastName: claims.family_name ?? null,
     pictureUrl: claims.picture ?? null,
+    // A palette this app doesn't have falls back to its default.
+    palette: isPaletteId(claims.palette) ? claims.palette : null,
     role: claims.role
   }
 

@@ -18,13 +18,22 @@ function cleanName (value: unknown): string | null | undefined {
 
 export default defineEventHandler(async (event) => {
   const user = await requireUser(event)
-  const body = await readBody<{ firstName?: unknown, lastName?: unknown, palette?: unknown, dismissOnboarding?: unknown }>(event)
+  const body = await readBody<{ firstName?: unknown, lastName?: unknown, palette?: unknown, dismissOnboarding?: unknown, scope?: unknown }>(event)
 
   const patch: ProfilePatch = {}
 
-  // Names belong to Authrr when it runs accounts; edit them there.
-  if (authrrEnabled() && (body?.firstName !== undefined || body?.lastName !== undefined)) {
-    throw createError({ statusCode: 400, statusMessage: 'Your name is managed by Authrr' })
+  // Through Authrr, name and palette are settings there (server/utils/
+  // settings.ts): for every app, or with scope 'app' just this one.
+  if (authrrEnabled()) {
+    const scope = body?.scope === 'app' ? 'app' : 'global'
+    if (body?.firstName !== undefined) await setSetting(event, user.id, 'name.first', cleanName(body.firstName), scope)
+    if (body?.lastName !== undefined) await setSetting(event, user.id, 'name.last', cleanName(body.lastName), scope)
+    if (body?.palette !== undefined) {
+      if (!isPaletteId(body.palette)) throw createError({ statusCode: 400, statusMessage: 'Unknown colour palette' })
+      await setSetting(event, user.id, 'palette', body.palette, scope)
+    }
+    if (body?.dismissOnboarding === true) await updateUserProfile(user.id, { onboardingDismissedAt: new Date().toISOString() })
+    return { ok: true }
   }
 
   const first = cleanName(body?.firstName)

@@ -1,6 +1,12 @@
-// Drops the uploaded photo and falls the profile back to Gravatar.
+// Drops the uploaded photo and falls the profile back to Gravatar. Through
+// Authrr, ?scope=app drops just this app's own photo (back to the one every
+// app shows); otherwise the photo every app shows.
 export default defineEventHandler(async (event) => {
   const session = await requireUser(event)
+  if (authrrEnabled()) {
+    await removeAuthrrPhoto(event, session.id, getQuery(event).scope === 'app' ? 'app' : 'global')
+    return { ok: true }
+  }
   const user = await getUserById(session.id)
   if (user?.avatarKey) {
     try {

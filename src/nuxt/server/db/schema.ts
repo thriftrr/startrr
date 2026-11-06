@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // Every table an app built on this template starts with. Add your own below;
 // `npx nuxt db generate` writes the migration.
@@ -94,3 +94,16 @@ export const feedback = sqliteTable('feedback', {
   resolvedAt: text('resolved_at'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`)
 })
+
+// Settings beyond the profile columns (shared/types/settings.ts), when this
+// app runs its own accounts. Signed in through Authrr, settings live there
+// instead and this table stays empty.
+export const userSettings = sqliteTable('user_settings', {
+  userId: text('user_id').notNull(),
+  key: text('key').notNull(),
+  // JSON
+  value: text('value').notNull(),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
+}, table => [
+  primaryKey({ columns: [table.userId, table.key] })
+])

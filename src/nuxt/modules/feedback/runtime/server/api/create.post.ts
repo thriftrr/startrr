@@ -33,7 +33,11 @@ export default defineEventHandler(async (event) => {
     receivedAt: new Date(record.createdAt),
     inboxUrl: `${(useRuntimeConfig().appOrigin || getRequestURL(event).origin).replace(/\/$/, '')}/admin/feedback`
   })
-  await Promise.all(adminEmails().map(to =>
+  // Admins who turned notification emails off are skipped; one with no
+  // account yet (only listed in NUXT_ADMIN_EMAILS) still gets it.
+  const recipients = (await Promise.all(adminEmails().map(async to => (await wantsNotificationEmailsAt(event, to)) ? to : null)))
+    .filter((to): to is string => Boolean(to))
+  await Promise.all(recipients.map(to =>
     sendEmail(event, { to, ...message }).catch((err: unknown) => {
       console.error('[feedback] notification email failed:', (err as Error)?.message ?? err)
     })

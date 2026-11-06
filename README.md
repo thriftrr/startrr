@@ -67,7 +67,7 @@ src/nuxt/
   app/                   pages, components, composables, layouts, middleware
   server/routes/         auth/authrr (start, callback) — sign-in through Authrr
   server/api/            auth, account, scratch (example)
-  server/utils/          session, auth-db, passkeys, authrr, rate-limit, email, turnstile, origin
+  server/utils/          session, auth-db, passkeys, authrr, settings, rate-limit, email, turnstile, origin
   server/middleware/     security headers + CSP nonce, origin check, body limit
   server/plugins/        csp-nonce (stamps the nonce onto rendered scripts)
   server/db/schema.ts    users, login_tokens, sessions, passkeys, feedback
@@ -156,7 +156,36 @@ What changes:
   the internet — Cloudflare doesn't always let a Worker fetch another
   Worker's domain in the same zone.
 
+- **Settings follow the person.** Name, photo, palette and notification
+  emails live in Authrr: one value for every thriftrr app, and per app an
+  optional override. The account page edits them with an "All thriftrr
+  apps / Just Startrr" choice on each (everywhere by default; a setting
+  that already has its own value here starts on "just this app"). Authrr's
+  account page lists every app's overrides, to undo.
+
 Leave `NUXT_PUBLIC_AUTHRR_ISSUER` empty and nothing here applies.
+
+## Settings
+
+`server/utils/settings.ts` reads and writes a person's settings the same
+way whichever mode the app is in:
+
+```ts
+const buyIn = await getSetting(event, user.id, 'startrr.default_buy_in', 200)
+await setSetting(event, user.id, 'startrr.default_buy_in', 500)        // everywhere
+await setSetting(event, user.id, 'startrr.default_buy_in', 500, 'app') // just this app
+if (await wantsNotificationEmails(event, user.id)) { /* send it */ }
+```
+
+Through Authrr they're stored there, layered as above; running its own
+accounts there's only this app, so the scope makes no difference and they
+live in `users` and `user_settings`. Keys are lowercase words joined by
+dots; prefix an app's own with its slug. The browser can change the
+built-ins and this app's own keys through `PATCH /api/account/settings`;
+server code can set anything. Name, palette and photo URL are also copied
+onto `users`, so pages render them without a round trip; the copy is
+refreshed at sign-in, on every change made here, and at the hourly session
+check (a change made in another app shows up here within the hour).
 
 ## Feedback module
 
