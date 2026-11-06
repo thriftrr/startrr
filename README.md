@@ -187,20 +187,13 @@ One Worker with D1 (database), two KV namespaces (rate limits/notes + cache),
 and an R2 bucket (profile pictures). Everything is created in **your**
 Cloudflare account; the repo carries no account ids.
 
-1. `npx wrangler login` once, then create the resources:
-
-   ```sh
-   cd src/nuxt
-   npx wrangler d1 create startrr-db
-   npx wrangler kv namespace create startrr-kv
-   npx wrangler kv namespace create startrr-cache
-   npx wrangler r2 bucket create startrr-blob
-   ```
-
-2. Fill the "Cloudflare deployment" block of `src/nuxt/.env` with the ids
-   wrangler printed, plus `NUXT_CF_ACCOUNT_ID`, `NUXT_APP_ORIGIN`,
-   `NUXT_ADMIN_EMAILS`, a generated `NUXT_SESSION_SECRET`, and the
-   email-sending settings above.
+1. `npx wrangler login` once, then `make setup`. It creates the D1
+   database, both KV namespaces and the R2 bucket (startrr-db, startrr-kv,
+   startrr-cache, startrr-blob) in your account and writes their ids into
+   `src/nuxt/.env`, with your account id and a generated session secret.
+   Re-running it is safe: anything already there is left alone.
+2. Fill in what only you know — `make setup` lists it: `NUXT_APP_ORIGIN`,
+   `NUXT_ADMIN_EMAILS`, and the email-sending settings above (plus the `NUXT_AUTHRR_*` values, if signing in through Authrr).
 3. `make secrets` pushes the secret values (session secret, email token,
    Turnstile secret) to the worker. Run it again whenever one changes.
 4. `make deploy` builds with the Cloudflare preset, applies pending D1
